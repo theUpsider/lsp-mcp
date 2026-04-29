@@ -1,0 +1,42 @@
+!SESSION 2026-04-29 16:06:20.243 -----------------------------------------------
+eclipse.buildId=unknown
+java.version=21.0.10
+java.vendor=Ubuntu
+BootLoader constants: OS=linux, ARCH=x86_64, WS=gtk, NL=en_US
+Command-line arguments:  -data /home/david/dev/lsp-mcp/.jdtls-workspace
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-04-29 16:06:20.906
+!MESSAGE class org.eclipse.jdt.ls.core.internal.JavaLanguageServerPlugin is started
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-04-29 16:06:20.929
+!MESSAGE Started org.eclipse.buildship.core 15ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-04-29 16:06:20.930
+!MESSAGE Started org.eclipse.m2e.core 0ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-04-29 16:06:20.999
+!MESSAGE Main thread is waiting
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-04-29 16:06:21.280
+!MESSAGE ProjectRegistryRefreshJob finished 350ms
+!SESSION 2026-04-29 16:08:45.007 -----------------------------------------------
+eclipse.buildId=unknown
+java.version=21.0.10
+java.vendor=Ubuntu
+BootLoader constants: OS=linux, ARCH=x86_64, WS=gtk, NL=en_US
+Command-line arguments:  -data /home/david/dev/lsp-mcp/.jdtls-workspace
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-04-29 16:08:45.653
+!MESSAGE class org.eclipse.jdt.ls.core.internal.JavaLanguageServerPlugin is started
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-04-29 16:08:45.677
+!MESSAGE Started org.eclipse.buildship.core 15ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-04-29 16:08:45.678
+!MESSAGE Started org.eclipse.m2e.core 0ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-04-29 16:08:45.714
+!MESSAGE Main thread is waiting
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-04-29 16:08:45.995
+!MESSAGE ProjectRegistryRefreshJob finished 316ms

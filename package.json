@@ -1,0 +1,32 @@
+{
+  "name": "@theupsider/lsp-mcp",
+  "version": "0.1.0",
+  "description": "Universal LSP MCP server",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "bin": {
+    "lsp-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --config jest.config.js --coverage",
+    "test:integration": "jest --config jest.config.integration.js",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "vscode-languageserver-protocol": "latest",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/jest": "latest",
+    "@types/node": "latest",
+    "jest": "latest",
+    "ts-jest": "latest",
+    "typescript": "latest"
+  }
+}
