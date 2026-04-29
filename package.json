@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc",
     "test": "jest --config jest.config.js --coverage",
-    "test:integration": "jest --config jest.config.integration.js",
+    "test:integration": "jest --config jest.config.integration.js --forceExit --runInBand",
     "start": "node dist/index.js"
   },
   "dependencies": {

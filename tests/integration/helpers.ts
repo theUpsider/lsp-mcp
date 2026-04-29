@@ -7,7 +7,8 @@ import { getLspCandidates } from '../../src/detection/lsp-mapping';
 import { LspClient } from '../../src/lsp/lsp-client';
 import type { LanguageServerHealth } from '../../src/lsp/lifecycle-manager';
 import { registerReadTools } from '../../src/mcp/tools/read-tools';
-import { clearOpenedFiles, type McpToolResult, type MinimalLifecycleManager, type ToolRegistrar } from '../../src/mcp/tools/shared';
+import { clearOpenedFiles, ensureDidOpen, type McpToolResult, type MinimalLifecycleManager, type ToolRegistrar } from '../../src/mcp/tools/shared';
+import { pathToUri } from '../../src/utils/uri';
 
 export interface TmpProject {
   dir: string;
@@ -133,7 +134,7 @@ async function waitForMeaningfulResult(
   return await invokeTool(toolName, client, language, file, line, character);
 }
 
-function invokeTool(toolName: SmokeTool, client: LspClient, language: string, file: string, line: number, character: number): Promise<SmokeResult> {
+async function invokeTool(toolName: SmokeTool, client: LspClient, language: string, file: string, line: number, character: number): Promise<SmokeResult> {
   const registrar = new IntegrationRegistrar();
   registerReadTools(registrar, createLifecycleManager(client, language));
 
@@ -142,7 +143,12 @@ function invokeTool(toolName: SmokeTool, client: LspClient, language: string, fi
     throw new Error(`${toolName} tool was not registered`);
   }
 
-  return handler({ file, line, character }).then((result) => ({
+  if (language === 'rust') {
+    await ensureDidOpen(client, file);
+    client.notify('textDocument/didSave', { textDocument: { uri: pathToUri(file) } });
+  }
+
+  return await handler({ file, line, character }).then((result) => ({
     text: extractText(result),
     raw: result.raw
   }));
