@@ -1,9 +1,12 @@
 {
-  "mcpServers": {
-    "lsp-mcp": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@theupsider/lsp-mcp"]
+    "mcpServers": {
+        "lsp-mcp": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+                "-y",
+                "@theupsider/lsp-mcp"
+            ]
+        }
     }
-  }
 }
