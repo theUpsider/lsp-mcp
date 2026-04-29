@@ -4,7 +4,7 @@
   "description": "Universal LSP MCP server",
   "license": "Apache-2.0",
   "type": "commonjs",
-  "mcpName": "io.github.theupsider/lsp-mcp",
+  "mcpName": "io.github.theUpsider/lsp-mcp",
   "author": {
     "name": "David Fischer",
     "url": "https://davidfischer.dev"
