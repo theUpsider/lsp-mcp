@@ -233,7 +233,7 @@ if ! command -v swiftly >/dev/null 2>&1; then
   tar -xzf swiftly.tar.gz
 
   # init ist interaktiv-arm, --quiet-shell-followup verhindert nur Shell-Hinweise
-  ./swiftly init --quiet-shell-followup
+  ./swiftly init --quiet-shell-followup --assume-yes
 
   cd "$OLDPWD"
   rm -rf "$TMP_SWIFTLY_DIR"
