@@ -41,6 +41,8 @@ A Model Context Protocol (MCP) server that gives language models access to **Lan
 
 ## Installation
 
+> **Important:** Install `lsp-mcp` on the **same machine where your code lives**. The language servers it manages need direct filesystem access to your codebase — they cannot work over a remote connection or on a different machine than your source files.
+
 ```bash
 # npm
 npm install -g @theupsider/lsp-mcp
@@ -107,7 +109,6 @@ lsp_init({ root: "/path/to/project", languages: ["python", "typescript"] })
 
 | Environment Variable | Description                         | Default      |
 | -------------------- | ----------------------------------- | ------------ |
-| `LSP_MCP_ROOT`       | Project root (auto-calls `lsp_init` on startup) | _(optional)_ |
 | `LSP_MCP_LOG_LEVEL`  | Log level: `error`, `info`, `debug` | `info`       |
 
 ## Setup Scripts
@@ -152,7 +153,7 @@ gem install solargraph
 
 ### Server not detecting language
 
-Ensure your project root contains a language marker file (e.g., `package.json` for TypeScript, `Cargo.toml` for Rust). The server scans the `LSP_MCP_ROOT` directory for these markers.
+Ensure your project root contains a language marker file (e.g., `package.json` for TypeScript, `Cargo.toml` for Rust). The server scans the directory passed to `lsp_init` for these markers.
 
 ### High memory usage
 

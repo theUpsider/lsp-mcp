@@ -13,7 +13,7 @@ describe('index entrypoint', () => {
     jest.clearAllMocks();
   });
 
-  it('starts and waits for lsp_init when LSP_MCP_ROOT is missing', async () => {
+  it('starts and waits for lsp_init', async () => {
     const stderr = jest.fn();
     const exit = jest.fn();
     const McpServer = jest.requireMock('../mcp/server').McpServer as jest.Mock;
@@ -38,17 +38,14 @@ describe('index entrypoint', () => {
     expect(exit).toHaveBeenCalledWith(0);
   });
 
-  it('boots lifecycle, logs startup report, and starts the MCP server', async () => {
+  it('uses LSP_MCP_LOG_LEVEL and registers signals', async () => {
     const stderr = jest.fn();
     const onSignal = jest.fn();
     const McpServer = jest.requireMock('../mcp/server').McpServer as jest.Mock;
 
-    await main([], { LSP_MCP_ROOT: '/workspace', LSP_MCP_LOG_LEVEL: 'debug' }, { stderr, onSignal });
+    await main([], { LSP_MCP_LOG_LEVEL: 'debug' }, { stderr, onSignal });
 
-    const serverInstance = McpServer.mock.results[0]?.value;
     expect(McpServer).toHaveBeenCalledWith('debug');
-    expect(serverInstance.initializeManager).toHaveBeenCalledWith('/workspace');
-    expect(stderr).toHaveBeenCalledWith(`${JSON.stringify({ languages: ['typescript'], started: ['typescript'], errors: [] })}\n`);
     expect(McpServer).toHaveBeenCalledTimes(1);
     expect(onSignal).toHaveBeenCalledTimes(2);
   });

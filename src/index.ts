@@ -28,17 +28,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, over
     return;
   }
 
-  const projectRoot = env.LSP_MCP_ROOT;
   const logLevel = env.LSP_MCP_LOG_LEVEL ?? 'info';
   const mcpServer = new McpServer(logLevel);
 
-  if (projectRoot) {
-    const initialized = await mcpServer.initializeManager(projectRoot);
-    const startupReport = summarizeHealth(initialized.health);
-    stderr(`${JSON.stringify(startupReport)}\n`);
-  } else {
-    stderr(`${JSON.stringify({ event: 'startup', status: 'waiting-for-init' })}\n`);
-  }
+  stderr(`${JSON.stringify({ event: 'startup', status: 'waiting-for-init' })}\n`);
 
   await mcpServer.start();
 
@@ -49,14 +42,6 @@ export async function main(argv = process.argv.slice(2), env = process.env, over
 
   onSignal('SIGINT', shutdown);
   onSignal('SIGTERM', shutdown);
-}
-
-function summarizeHealth(health: Array<{ language: string; status: 'ready' | 'error' | 'starting'; error?: string }>): { languages: string[]; started: string[]; errors: string[] } {
-  return {
-    languages: health.map((entry) => entry.language),
-    started: health.filter((entry) => entry.status === 'ready').map((entry) => entry.language),
-    errors: health.filter((entry) => entry.status === 'error' && entry.error).map((entry) => entry.error as string)
-  };
 }
 
 function readVersion(): string {
