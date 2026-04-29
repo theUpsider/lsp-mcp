@@ -10,6 +10,7 @@ import { ensureDidOpen, failure, mapToolError, noServerResult, success, type Min
 export function registerWriteTools(registrar: ToolRegistrar, lifecycleManager: MinimalLifecycleManager): void {
   registrar.registerTool('lsp_rename', { description: 'Rename symbol', inputSchema: z.object({ file: z.string(), line: z.number().int(), character: z.number().int(), newName: z.string() }) }, async (args) => {
     const filePath = getFilePath(args);
+    await lifecycleManager.ensureLanguageForFile(filePath);
     const client = lifecycleManager.getClientForFile(filePath);
     if (!client) {
       return noServerResult(filePath);
@@ -34,6 +35,7 @@ export function registerWriteTools(registrar: ToolRegistrar, lifecycleManager: M
 
   registrar.registerTool('lsp_code_action', { description: 'List or apply code actions', inputSchema: z.object({ file: z.string(), line: z.number().int(), character: z.number().int(), apply: z.union([z.boolean(), z.object({ index: z.number().int() })]).optional(), range: rangeSchema.optional() }) }, async (args) => {
     const filePath = getFilePath(args);
+    await lifecycleManager.ensureLanguageForFile(filePath);
     const client = lifecycleManager.getClientForFile(filePath);
     if (!client) {
       return noServerResult(filePath);
@@ -113,6 +115,7 @@ async function runFormattingRequest(
   requestEdits: (client: MinimalLspClient, filePath: string, options: { tabSize: number; insertSpaces: boolean }) => Promise<TextEdit[] | null>
 ) {
   const filePath = getFilePath(args);
+  await lifecycleManager.ensureLanguageForFile(filePath);
   const client = lifecycleManager.getClientForFile(filePath);
   if (!client) {
     return noServerResult(filePath);

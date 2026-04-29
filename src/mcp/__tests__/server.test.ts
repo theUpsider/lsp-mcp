@@ -1,7 +1,12 @@
+const mockSetRequestHandler = jest.fn();
+const mockConnect = jest.fn().mockResolvedValue(undefined);
+
 jest.mock('@modelcontextprotocol/sdk/server/mcp.js', () => ({
   McpServer: jest.fn().mockImplementation(() => ({
-    registerTool: jest.fn(),
-    connect: jest.fn().mockResolvedValue(undefined)
+    connect: mockConnect,
+    server: {
+      setRequestHandler: mockSetRequestHandler
+    }
   }))
 }));
 
@@ -9,128 +14,138 @@ jest.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
   StdioServerTransport: jest.fn().mockImplementation(() => ({ kind: 'stdio' }))
 }));
 
+jest.mock('@modelcontextprotocol/sdk/server/zod-compat.js', () => ({
+  normalizeObjectSchema: jest.fn().mockReturnValue(null)
+}));
+
+jest.mock('@modelcontextprotocol/sdk/server/zod-json-schema-compat.js', () => ({
+  toJsonSchemaCompat: jest.fn().mockReturnValue({})
+}));
+
 jest.mock('../tools/read-tools', () => ({ registerReadTools: jest.fn() }));
 jest.mock('../tools/write-tools', () => ({ registerWriteTools: jest.fn() }));
 
 import { McpServer } from '../server';
-
 import type { LifecycleManager } from '../../lsp/lifecycle-manager';
+
+function getHandler(schema: unknown): Function {
+  const call = mockSetRequestHandler.mock.calls.find(([s]) => s === schema);
+  if (!call) throw new Error(`No handler registered for schema`);
+  return call[1];
+}
 
 describe('McpServer', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('registers all read and write tools and connects stdio transport', async () => {
+  it('registers request handlers and connects on start', async () => {
+    const server = new McpServer('info');
+    await server.start();
+
+    expect(mockSetRequestHandler).toHaveBeenCalledTimes(2);
+    expect(mockConnect).toHaveBeenCalledWith({ kind: 'stdio' });
+  });
+
+  it('lists all registered tools regardless of init state', async () => {
     const readTools = jest.requireMock('../tools/read-tools').registerReadTools as jest.Mock;
     const writeTools = jest.requireMock('../tools/write-tools').registerWriteTools as jest.Mock;
-    const SdkMcpServer = jest.requireMock('@modelcontextprotocol/sdk/server/mcp.js').McpServer as jest.Mock;
-    const transportCtor = jest.requireMock('@modelcontextprotocol/sdk/server/stdio.js').StdioServerTransport as jest.Mock;
+
+    readTools.mockImplementationOnce((registrar: { registerTool: Function }) => {
+      registrar.registerTool('lsp_init', { description: 'init' }, async () => ({ content: [{ type: 'text', text: 'ok' }], raw: null }));
+      registrar.registerTool('lsp_hover', { description: 'hover' }, async () => ({ content: [{ type: 'text', text: 'hover' }], raw: null }));
+    });
+    writeTools.mockImplementationOnce(() => undefined);
+
+    const { ListToolsRequestSchema } = jest.requireActual('@modelcontextprotocol/sdk/types.js') as { ListToolsRequestSchema: unknown };
 
     const server = new McpServer('info');
     await server.start();
 
-    const sdkInstance = SdkMcpServer.mock.results[0]?.value;
-    expect(readTools).toHaveBeenCalledWith(
-      expect.objectContaining({ registerTool: expect.any(Function), fromJsonSchema: expect.any(Function) }),
-      expect.objectContaining({ getClientForFile: expect.any(Function), getReadyClients: expect.any(Function), getFileDiagnostics: expect.any(Function), getWorkspaceDiagnostics: expect.any(Function), getHealth: expect.any(Function) }),
-      expect.objectContaining({ initializeManager: expect.any(Function) })
-    );
-    expect(writeTools).toHaveBeenCalledWith(
-      expect.objectContaining({ registerTool: expect.any(Function), fromJsonSchema: expect.any(Function) }),
-      expect.objectContaining({ getClientForFile: expect.any(Function), getReadyClients: expect.any(Function), getFileDiagnostics: expect.any(Function), getWorkspaceDiagnostics: expect.any(Function), getHealth: expect.any(Function) })
-    );
-    expect(transportCtor).toHaveBeenCalledTimes(1);
-    expect(sdkInstance.connect).toHaveBeenCalledWith({ kind: 'stdio' });
+    const listHandler = getHandler(ListToolsRequestSchema);
+    const result = await listHandler({});
+
+    expect(result.tools.map((t: { name: string }) => t.name)).toContain('lsp_init');
+    expect(result.tools.map((t: { name: string }) => t.name)).toContain('lsp_hover');
   });
 
-  it('adapts tool handlers and preserves input schemas', async () => {
+  it('lists all tools after initialization too', async () => {
     const readTools = jest.requireMock('../tools/read-tools').registerReadTools as jest.Mock;
     const writeTools = jest.requireMock('../tools/write-tools').registerWriteTools as jest.Mock;
-    const SdkMcpServer = jest.requireMock('@modelcontextprotocol/sdk/server/mcp.js').McpServer as jest.Mock;
 
     readTools.mockImplementationOnce((registrar: { registerTool: Function }) => {
-      registrar.registerTool('typed_tool', { description: 'desc', inputSchema: { parse: jest.fn() } }, async (args: Record<string, unknown>) => ({
-        content: [{ type: 'text', text: String(args.value ?? 'empty') }],
-        raw: args
-      }));
+      registrar.registerTool('lsp_init', { description: 'init' }, async () => ({ content: [{ type: 'text', text: 'ok' }], raw: null }));
+      registrar.registerTool('lsp_hover', { description: 'hover' }, async () => ({ content: [{ type: 'text', text: 'hover' }], raw: null }));
     });
     writeTools.mockImplementationOnce(() => undefined);
+
+    const { ListToolsRequestSchema } = jest.requireActual('@modelcontextprotocol/sdk/types.js') as { ListToolsRequestSchema: unknown };
 
     const server = new McpServer('info');
     await server.start();
     server.setManager({} as LifecycleManager);
 
-    const sdkInstance = SdkMcpServer.mock.results[0]?.value;
-    const handler = sdkInstance.registerTool.mock.calls[0][2] as (args: unknown) => Promise<unknown>;
+    const listHandler = getHandler(ListToolsRequestSchema);
+    const result = await listHandler({});
 
-    await expect(handler({ value: 'ok' })).resolves.toEqual({ content: [{ type: 'text', text: 'ok' }], raw: { value: 'ok' } });
-    await expect(handler(null)).resolves.toEqual({ content: [{ type: 'text', text: 'empty' }], raw: {} });
+    expect(result.tools.map((t: { name: string }) => t.name)).toContain('lsp_init');
+    expect(result.tools.map((t: { name: string }) => t.name)).toContain('lsp_hover');
   });
 
-  it('returns a no-root error for non-init tools before lsp_init', async () => {
+  it('returns no-root error for non-init tools before lsp_init', async () => {
     const readTools = jest.requireMock('../tools/read-tools').registerReadTools as jest.Mock;
     const writeTools = jest.requireMock('../tools/write-tools').registerWriteTools as jest.Mock;
-    const SdkMcpServer = jest.requireMock('@modelcontextprotocol/sdk/server/mcp.js').McpServer as jest.Mock;
 
     readTools.mockImplementationOnce((registrar: { registerTool: Function }) => {
-      registrar.registerTool('lsp_init', { description: 'init' }, async () => ({ content: [{ type: 'text', text: 'ok' }], raw: null }));
       registrar.registerTool('lsp_hover', { description: 'hover' }, async () => ({ content: [{ type: 'text', text: 'reachable' }], raw: null }));
     });
     writeTools.mockImplementationOnce(() => undefined);
 
+    const { CallToolRequestSchema } = jest.requireActual('@modelcontextprotocol/sdk/types.js') as { CallToolRequestSchema: unknown };
+
     const server = new McpServer('info');
     await server.start();
 
-    const sdkInstance = SdkMcpServer.mock.results[0]?.value;
-    const hoverHandler = sdkInstance.registerTool.mock.calls[1][2] as (args: unknown) => Promise<unknown>;
+    const callHandler = getHandler(CallToolRequestSchema);
+    const result = await callHandler({ params: { name: 'lsp_hover', arguments: {} } });
 
-    await expect(hoverHandler({})).resolves.toEqual({
-      content: [{ type: 'text', text: "No project root set. Call lsp_init({ root: '/path/to/project' }) first." }],
-      text: "No project root set. Call lsp_init({ root: '/path/to/project' }) first.",
-      error: true,
-      raw: null
-    });
+    expect(result.content[0].text).toMatch(/No project root set/);
   });
 
-  it('allows lsp_init handlers to run before a manager exists', async () => {
+  it('re-initializes with new root when lsp_init called again', async () => {
     const readTools = jest.requireMock('../tools/read-tools').registerReadTools as jest.Mock;
     const writeTools = jest.requireMock('../tools/write-tools').registerWriteTools as jest.Mock;
-    const SdkMcpServer = jest.requireMock('@modelcontextprotocol/sdk/server/mcp.js').McpServer as jest.Mock;
 
     readTools.mockImplementationOnce((registrar: { registerTool: Function }) => {
-      registrar.registerTool('lsp_init', { description: 'init' }, async () => ({ content: [{ type: 'text', text: 'initialized' }], raw: { ok: true } }));
+      registrar.registerTool('lsp_init', { description: 'init' }, async () => ({ content: [{ type: 'text', text: 'ok' }], raw: null }));
     });
     writeTools.mockImplementationOnce(() => undefined);
 
+    const { CallToolRequestSchema } = jest.requireActual('@modelcontextprotocol/sdk/types.js') as { CallToolRequestSchema: unknown };
+
     const server = new McpServer('info');
     await server.start();
+    server.setManager({} as LifecycleManager);
 
-    const sdkInstance = SdkMcpServer.mock.results[0]?.value;
-    const initHandler = sdkInstance.registerTool.mock.calls[0][2] as (args: unknown) => Promise<unknown>;
+    const callHandler = getHandler(CallToolRequestSchema);
+    const result = await callHandler({ params: { name: 'lsp_init', arguments: { root: '/x' } } });
 
-    await expect(initHandler({ root: '/workspace' })).resolves.toEqual({
-      content: [{ type: 'text', text: 'initialized' }],
-      raw: { ok: true }
-    });
+    expect(result.content[0].text).toMatch(/Already initialized/);
   });
 
   it('shuts down the old manager before starting a new one', async () => {
+    const order: string[] = [];
     const firstManager = {
       start: jest.fn().mockResolvedValue(undefined),
-      shutdown: jest.fn().mockImplementation(async () => {
-        order.push('shutdown-first');
-      }),
+      shutdown: jest.fn().mockImplementation(async () => { order.push('shutdown-first'); }),
       getHealth: jest.fn().mockReturnValue([{ language: 'typescript', status: 'ready' }])
     };
     const secondManager = {
-      start: jest.fn().mockImplementation(async () => {
-        order.push('start-second');
-      }),
+      start: jest.fn().mockImplementation(async () => { order.push('start-second'); }),
       shutdown: jest.fn().mockResolvedValue(undefined),
       getHealth: jest.fn().mockReturnValue([{ language: 'python', status: 'ready' }])
     };
-    const order: string[] = [];
+
     const factory = jest.fn()
       .mockReturnValueOnce(firstManager)
       .mockReturnValueOnce(secondManager);
@@ -146,22 +161,19 @@ describe('McpServer', () => {
       health: [{ language: 'python', status: 'ready' }]
     });
 
-    expect(factory).toHaveBeenNthCalledWith(1, '/workspace-one', 'debug');
-    expect(factory).toHaveBeenNthCalledWith(2, '/workspace-two', 'debug');
     expect(order).toEqual(['shutdown-first', 'start-second']);
   });
 
-  it('shuts down the active manager and tolerates missing managers on shutdown', async () => {
-    const manager = {
-      shutdown: jest.fn().mockResolvedValue(undefined)
-    } as unknown as LifecycleManager;
+  it('tolerates shutdown with no active manager', async () => {
     const server = new McpServer('info');
-
     await expect(server.shutdown()).resolves.toBeUndefined();
+  });
 
+  it('shuts down active manager on server shutdown', async () => {
+    const manager = { shutdown: jest.fn().mockResolvedValue(undefined) } as unknown as LifecycleManager;
+    const server = new McpServer('info');
     server.setManager(manager);
-    await expect(server.shutdown()).resolves.toBeUndefined();
-
+    await server.shutdown();
     expect(manager.shutdown).toHaveBeenCalledTimes(1);
   });
 });

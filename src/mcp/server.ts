@@ -35,7 +35,7 @@ export class McpServer {
       fromJsonSchema: (schema) => schema
     };
 
-    registerReadTools(registrar, lifecycleProxy, { initializeManager: async (root) => await this.initializeManager(root) });
+    registerReadTools(registrar, lifecycleProxy, { initializeManager: async (root, languages) => await this.initializeManager(root, languages) });
     registerWriteTools(registrar, lifecycleProxy);
     this.configureToolHandlers();
 
@@ -43,8 +43,7 @@ export class McpServer {
     await this.server.connect(transport);
   }
 
-  public async initializeManager(root: string): Promise<{ root: string; health: ReturnType<LifecycleManager['getHealth']> }> {
-    const wasInitialized = this.initialized;
+  public async initializeManager(root: string, languages?: string[]): Promise<{ root: string; health: ReturnType<LifecycleManager['getHealth']> }> {
     const nextManager = this.createLifecycleManager(root, this.logLevel);
     const previousManager = this.currentManager;
 
@@ -54,13 +53,9 @@ export class McpServer {
       this.currentRoot = null;
     }
 
-    await nextManager.start();
+    await nextManager.start(languages);
     this.setManager(nextManager);
     this.currentRoot = root;
-
-    if (!wasInitialized && this.server.isConnected()) {
-      await this.server.server.sendToolListChanged();
-    }
 
     return { root, health: nextManager.getHealth() };
   }
@@ -81,12 +76,11 @@ export class McpServer {
   }
 
   private configureToolHandlers(): void {
-    this.server.server.registerCapabilities({ tools: { listChanged: true } });
     this.server.server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: this.listTools() }));
     this.server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const toolName = request.params.name;
       if (toolName === 'lsp_init' && this.initialized) {
-        return failure(`Already initialized. Root is set to ${this.currentRoot ?? 'unknown'}. Restart server to change root.`);
+        return failure(`Already initialized at ${this.currentRoot ?? 'unknown'}. Call lsp_init again with a new root to switch projects.`);
       }
 
       if (toolName !== 'lsp_init' && !this.initialized) {
@@ -103,8 +97,7 @@ export class McpServer {
   }
 
   private listTools(): Tool[] {
-    const availableTools = [...this.tools.values()].filter((tool) => this.initialized ? tool.name !== 'lsp_init' : tool.name === 'lsp_init');
-    return availableTools.map((tool) => ({
+    return [...this.tools.values()].map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: this.toInputSchema(tool.inputSchema)
@@ -113,9 +106,10 @@ export class McpServer {
 
   private toInputSchema(schema: AnySchema | undefined): Tool['inputSchema'] {
     const normalized = normalizeObjectSchema(schema);
-    return normalized
+    const result = normalized
       ? toJsonSchemaCompat(normalized, { strictUnions: true, pipeStrategy: 'input' })
-      : { type: 'object' };
+      : {};
+    return { type: 'object', ...result } as Tool['inputSchema'];
   }
 
   private createLifecycleProxy(): MinimalLifecycleManager {
@@ -124,7 +118,8 @@ export class McpServer {
       getReadyClients: (language) => this.requireManager().getReadyClients(language),
       getFileDiagnostics: (filePath) => this.requireManager().getFileDiagnostics(filePath),
       getWorkspaceDiagnostics: (language) => this.requireManager().getWorkspaceDiagnostics(language),
-      getHealth: () => this.requireManager().getHealth()
+      getHealth: () => this.requireManager().getHealth(),
+      ensureLanguageForFile: async (filePath) => await this.requireManager().ensureLanguageForFile(filePath)
     };
   }
 

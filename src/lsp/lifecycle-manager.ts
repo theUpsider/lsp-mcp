@@ -66,9 +66,34 @@ export class LifecycleManager {
     this.logLevel = normalizeLogLevel(logLevel);
   }
 
-  public async start(): Promise<void> {
-    const startPromise = this.startInternal();
+  public async start(languages?: string[]): Promise<void> {
+    const startPromise = this.startInternal(languages);
     await promiseWithTimeout(startPromise, 30000, 'Lifecycle start timed out');
+  }
+
+  public async ensureLanguage(language: string): Promise<void> {
+    if (this.states.has(language)) {
+      return;
+    }
+
+    const state: LanguageState = {
+      language,
+      client: null,
+      status: 'starting',
+      serverDef: null,
+      restartCount: 0,
+      healthInterval: null
+    };
+
+    this.states.set(language, state);
+    await this.startLanguage(state);
+  }
+
+  public async ensureLanguageForFile(filePath: string): Promise<void> {
+    const language = EXTENSION_LANGUAGE_MAP[path.extname(filePath).toLowerCase()];
+    if (language) {
+      await this.ensureLanguage(language);
+    }
   }
 
   public getClient(language: string): LspClient | null {
@@ -138,8 +163,10 @@ export class LifecycleManager {
     process.stderr.write(`{"timestamp":"${new Date().toISOString()}","level":"info","event":"Shutdown: ${clients.length - errors} LSP-Server beendet, ${errors} Fehler"}\n`);
   }
 
-  private async startInternal(): Promise<void> {
-    const detected = await detectLanguages(this.projectRoot);
+  private async startInternal(languages?: string[]): Promise<void> {
+    const detected = languages
+      ? languages.map((language) => ({ language }))
+      : await detectLanguages(this.projectRoot);
 
     for (const entry of detected) {
       const state: LanguageState = {

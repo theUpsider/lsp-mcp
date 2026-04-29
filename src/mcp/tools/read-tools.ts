@@ -31,11 +31,14 @@ import {
 import type { LanguageServerHealth } from '../../lsp/lifecycle-manager';
 
 interface ReadToolOptions {
-  initializeManager(root: string): Promise<{ root: string; health: LanguageServerHealth[] }>;
+  initializeManager(root: string, languages?: string[]): Promise<{ root: string; health: LanguageServerHealth[] }>;
 }
 
 export function registerReadTools(registrar: ToolRegistrar, lifecycleManager: MinimalLifecycleManager, options: ReadToolOptions): void {
-  registrar.registerTool('lsp_init', { description: 'Initialize LSP for a project root', inputSchema: z.object({ root: z.string() }) }, async (args) => {
+  registrar.registerTool('lsp_init', {
+    description: 'Initialize LSP for a project root. Pass languages to pre-warm specific servers; omit to auto-detect from project files (lazy startup per file if none found).',
+    inputSchema: z.object({ root: z.string(), languages: z.array(z.string()).optional() })
+  }, async (args) => {
     return await handleInitTool(args, options);
   });
 
@@ -162,18 +165,23 @@ async function handleInitTool(args: Record<string, unknown>, options: ReadToolOp
     return failure(`Project root does not exist: ${root}`);
   }
 
+  const languages = Array.isArray(args.languages)
+    ? (args.languages as unknown[]).filter((item): item is string => typeof item === 'string')
+    : undefined;
+
   try {
-    const initialized = await options.initializeManager(root);
-    const languages = initialized.health.map((entry) => formatLanguageName(entry.language));
+    const initialized = await options.initializeManager(root, languages);
+    const languageNames = initialized.health.map((entry) => formatLanguageName(entry.language));
     const started = initialized.health.filter((entry) => entry.status === 'ready').length;
     const errors = initialized.health.filter((entry) => entry.status === 'error').length;
-    const text = `Initialized LSP for ${initialized.root}. Detected languages: ${formatLanguageList(languages)}. LSP servers: ${started} started, ${errors} errors.`;
+    const lazyNote = languageNames.length === 0 ? ' Language servers will start on first file access.' : '';
+    const text = `Initialized LSP for ${initialized.root}. Detected languages: ${formatLanguageList(languageNames)}. LSP servers: ${started} started, ${errors} errors.${lazyNote}`;
     return {
       content: [{ type: 'text', text }],
       text,
       raw: {
         root: initialized.root,
-        languages,
+        languages: languageNames,
         health: initialized.health
       }
     };
@@ -198,6 +206,7 @@ async function runFileRequest<T>(options: {
   params?: (uri: string, position: { line: number; character: number }) => unknown;
 }): Promise<ReturnType<typeof success>> {
   const filePath = typeof options.args.file === 'string' ? options.args.file : '';
+  await options.lifecycleManager.ensureLanguageForFile(filePath);
   const client = options.lifecycleManager.getClientForFile(filePath);
   if (!client) {
     return noServerResult(filePath);

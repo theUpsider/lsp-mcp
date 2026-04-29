@@ -196,7 +196,8 @@ describe('registerWriteTools', () => {
       getReadyClients: jest.fn(() => []),
       getFileDiagnostics: jest.fn((_: string) => []),
       getWorkspaceDiagnostics: jest.fn(() => []),
-      getHealth: jest.fn(() => [])
+      getHealth: jest.fn(() => []),
+      ensureLanguageForFile: jest.fn().mockResolvedValue(undefined)
     });
 
     await expect(getHandler(registrar, 'lsp_apply_workspace_edit')({ edit: {} })).resolves.toEqual({
@@ -213,7 +214,8 @@ describe('registerWriteTools', () => {
       getReadyClients: jest.fn(() => []),
       getFileDiagnostics: jest.fn((_: string) => []),
       getWorkspaceDiagnostics: jest.fn(() => []),
-      getHealth: jest.fn(() => [])
+      getHealth: jest.fn(() => []),
+      ensureLanguageForFile: jest.fn().mockResolvedValue(undefined)
     };
     registerWriteTools(registrar, noClientLifecycle);
 
@@ -275,7 +277,8 @@ function createLifecycle(client: MockClient): MockLifecycle {
     getReadyClients: jest.fn(() => [client]),
     getFileDiagnostics: jest.fn((_: string) => []),
     getWorkspaceDiagnostics: jest.fn(() => []),
-    getHealth: jest.fn(() => [])
+    getHealth: jest.fn(() => []),
+    ensureLanguageForFile: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -309,4 +312,5 @@ interface MockLifecycle {
   getFileDiagnostics: jest.Mock<[], [string]>;
   getWorkspaceDiagnostics: jest.Mock<[], [string?]>;
   getHealth: jest.Mock<[], []>;
+  ensureLanguageForFile: jest.Mock<Promise<void>, [string]>;
 }

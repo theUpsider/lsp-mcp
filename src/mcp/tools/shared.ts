@@ -28,6 +28,7 @@ export interface MinimalLifecycleManager {
   getFileDiagnostics(filePath: string): DiagnosticWithUri[];
   getWorkspaceDiagnostics(language?: string): DiagnosticWithUri[];
   getHealth(): LanguageServerHealth[];
+  ensureLanguageForFile(filePath: string): Promise<void>;
 }
 
 export interface McpToolResult {

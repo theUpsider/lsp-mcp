@@ -52,27 +52,36 @@ bun install -g @theupsider/lsp-mcp
 ## Quickstart
 
 ```bash
-# Set the project root
-export LSP_MCP_ROOT=/path/to/your/project
-
 # Run the server (reads from stdin, writes to stdout)
 lsp-mcp
 ```
 
-The server will:
+The server starts with no active project. The first action the model must take is calling `lsp_init`:
 
-1. Scan `LSP_MCP_ROOT` for language markers
-2. Detect all supported languages in the project
-3. Start the appropriate language servers automatically
-4. Begin listening for MCP requests on stdin
+```
+lsp_init({ root: "/path/to/your/project" })
+```
+
+`lsp_init` will:
+
+1. Scan the root for language markers and start matching language servers (best-effort)
+2. Disappear from the tool list — subsequent calls to any LSP tool trigger lazy server startup for that file's language if no server was detected at init time
+3. Return health status for all servers that were started eagerly
+
+**Optional: pre-warm specific languages** (skips detection, faster cold start):
+
+```
+lsp_init({ root: "/path/to/project", languages: ["python", "typescript"] })
+```
 
 ## Available Tools
 
 ### Read-Only Tools
 
-| Tool                    | Description                     | Key Parameters                        |
-| ----------------------- | ------------------------------- | ------------------------------------- |
-| `lsp_hover`             | Show type info / documentation  | `file`, `line`, `character`           |
+| Tool                    | Description                             | Key Parameters                                         |
+| ----------------------- | --------------------------------------- | ------------------------------------------------------ |
+| `lsp_init`              | Initialize server for a project root    | `root` (required), `languages` (optional string array) |
+| `lsp_hover`             | Show type info / documentation          | `file`, `line`, `character`                            |
 | `lsp_definition`        | Go to definition                | `file`, `line`, `character`           |
 | `lsp_references`        | Find all references             | `file`, `line`, `character`           |
 | `lsp_document_symbols`  | List symbols in a file          | `file`                                |
@@ -98,7 +107,7 @@ The server will:
 
 | Environment Variable | Description                         | Default      |
 | -------------------- | ----------------------------------- | ------------ |
-| `LSP_MCP_ROOT`       | Project root directory              | _(required)_ |
+| `LSP_MCP_ROOT`       | Project root (auto-calls `lsp_init` on startup) | _(optional)_ |
 | `LSP_MCP_LOG_LEVEL`  | Log level: `error`, `info`, `debug` | `info`       |
 
 ## Setup Scripts

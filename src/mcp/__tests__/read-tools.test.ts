@@ -56,7 +56,7 @@ describe('registerReadTools', () => {
         ]
       }
     });
-    expect(initializeManager).toHaveBeenCalledWith('/workspace');
+    expect(initializeManager).toHaveBeenCalledWith('/workspace', undefined);
   });
 
   it('rejects invalid lsp_init roots clearly', async () => {
@@ -332,7 +332,8 @@ function createLifecycle(options: {
     getReadyClients: jest.fn((_: string | undefined) => options.workspaceClients ?? []),
     getFileDiagnostics: jest.fn((_: string) => (options.diagnostics ?? []).filter((diagnostic) => diagnostic.uri === 'file:///workspace/src/index.ts')),
     getWorkspaceDiagnostics: jest.fn((_: string | undefined) => options.diagnostics ?? []),
-    getHealth: jest.fn(() => options.health ?? [])
+    getHealth: jest.fn(() => options.health ?? []),
+    ensureLanguageForFile: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -358,6 +359,7 @@ interface MockLifecycle {
   getFileDiagnostics: jest.Mock<DiagnosticRecord[], [string]>;
   getWorkspaceDiagnostics: jest.Mock<DiagnosticRecord[], [string?]>;
   getHealth: jest.Mock<LanguageServerHealth[], []>;
+  ensureLanguageForFile: jest.Mock<Promise<void>, [string]>;
 }
 
 type DiagnosticRecord = Diagnostic & { uri?: string };
