@@ -1,10 +1,19 @@
 {
   "name": "@theupsider/lsp-mcp",
-  "version": "0.1.6",
+  "version": "1.0.0",
   "description": "Universal LSP MCP server",
   "license": "Apache-2.0",
   "type": "commonjs",
   "mcpName": "io.github.theUpsider/lsp-mcp",
+  "keywords": [
+    "lsp",
+    "mcp",
+    "language-server-protocol",
+    "model-context-protocol",
+    "tool",
+    "agent",
+    "llm"
+  ],
   "author": {
     "name": "David Fischer",
     "url": "https://davidfischer.dev"
