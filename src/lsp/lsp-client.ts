@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import path from "node:path";
 
@@ -115,17 +115,17 @@ export class LspClient extends EventEmitter {
           },
         ],
         capabilities: {
-        textDocument: {
-          publishDiagnostics: {
-            relatedInformation: true,
-            versionSupport: false,
-            tagSupport: { valueSet: [1, 2] }
+          textDocument: {
+            publishDiagnostics: {
+              relatedInformation: true,
+              versionSupport: false,
+              tagSupport: { valueSet: [1, 2] },
+            },
+            synchronization: {
+              didSave: true,
+            },
           },
-          synchronization: {
-            didSave: true
-          }
-        }
-      },
+        },
       },
       30000,
     );
@@ -237,6 +237,17 @@ export class LspClient extends EventEmitter {
       },
     });
     this.openedFiles.add(filePath);
+  }
+
+  public async ensureSeedFileOpen(extensions: string[]): Promise<void> {
+    if (this.openedFiles.size > 0) {
+      return;
+    }
+
+    const file = await findFirstFileWithExtension(this.projectRoot, extensions);
+    if (file) {
+      await this.ensureDidOpen(file);
+    }
   }
 
   private sendMessage(message: JsonRpcMessage): void {
@@ -398,4 +409,35 @@ function shouldLog(configuredLevel: LogLevel, messageLevel: LogLevel): boolean {
   };
 
   return order[messageLevel] <= order[configuredLevel];
+}
+
+const SKIP_DIRS = new Set([
+  'node_modules', '.git', 'dist', 'build', 'out', '.next',
+  'coverage', '__pycache__', 'target', '.cache', 'vendor',
+]);
+
+async function findFirstFileWithExtension(dir: string, extensions: string[]): Promise<string | null> {
+  const extensionSet = new Set(extensions.map((e) => e.toLowerCase()));
+
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  for (const entry of entries) {
+    if (entry.isFile() && extensionSet.has(path.extname(entry.name).toLowerCase())) {
+      return path.join(dir, entry.name);
+    }
+  }
+
+  for (const entry of entries) {
+    if (entry.isDirectory() && !SKIP_DIRS.has(entry.name)) {
+      const result = await findFirstFileWithExtension(path.join(dir, entry.name), extensions);
+      if (result) return result;
+    }
+  }
+
+  return null;
 }

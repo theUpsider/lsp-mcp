@@ -153,7 +153,7 @@ describe('mcp formatters', () => {
     expect(formatDefinition(null)).toBe('No result');
     expect(formatReferences([])).toBe('No result');
     expect(formatSymbols(null)).toBe('No result');
-    expect(formatDiagnostics([], 'file')).toBe('No result');
+    expect(formatDiagnostics([], 'file')).toBe('No diagnostics found');
     expect(formatCompletion(null)).toBe('No result');
     expect(formatHealth([])).toBe('No result');
   });

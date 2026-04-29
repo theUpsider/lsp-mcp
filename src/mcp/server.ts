@@ -118,7 +118,8 @@ export class McpServer {
       getFileDiagnostics: (filePath) => this.requireManager().getFileDiagnostics(filePath),
       getWorkspaceDiagnostics: (language) => this.requireManager().getWorkspaceDiagnostics(language),
       getHealth: () => this.requireManager().getHealth(),
-      ensureLanguageForFile: async (filePath) => await this.requireManager().ensureLanguageForFile(filePath)
+      ensureLanguageForFile: async (filePath) => await this.requireManager().ensureLanguageForFile(filePath),
+      ensureSeedFilesOpen: async () => await this.requireManager().ensureSeedFilesOpen()
     };
   }
 

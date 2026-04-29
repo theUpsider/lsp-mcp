@@ -195,7 +195,8 @@ describe('registerWriteTools', () => {
       getFileDiagnostics: jest.fn((_: string) => []),
       getWorkspaceDiagnostics: jest.fn(() => []),
       getHealth: jest.fn(() => []),
-      ensureLanguageForFile: jest.fn().mockResolvedValue(undefined)
+      ensureLanguageForFile: jest.fn().mockResolvedValue(undefined),
+      ensureSeedFilesOpen: jest.fn().mockResolvedValue(undefined)
     });
 
     await expect(getHandler(registrar, 'lsp_apply_workspace_edit')({ edit: {} })).resolves.toEqual({
@@ -213,7 +214,8 @@ describe('registerWriteTools', () => {
       getFileDiagnostics: jest.fn((_: string) => []),
       getWorkspaceDiagnostics: jest.fn(() => []),
       getHealth: jest.fn(() => []),
-      ensureLanguageForFile: jest.fn().mockResolvedValue(undefined)
+      ensureLanguageForFile: jest.fn().mockResolvedValue(undefined),
+      ensureSeedFilesOpen: jest.fn().mockResolvedValue(undefined)
     };
     registerWriteTools(registrar, noClientLifecycle);
 
@@ -276,7 +278,8 @@ function createLifecycle(client: MockClient): MockLifecycle {
     getFileDiagnostics: jest.fn((_: string) => []),
     getWorkspaceDiagnostics: jest.fn(() => []),
     getHealth: jest.fn(() => []),
-    ensureLanguageForFile: jest.fn().mockResolvedValue(undefined)
+    ensureLanguageForFile: jest.fn().mockResolvedValue(undefined),
+    ensureSeedFilesOpen: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -296,7 +299,8 @@ function createClient(result: unknown, capabilities: Record<string, unknown> = {
     notify: jest.fn(),
     getCapabilities: jest.fn(() => capabilities),
     ensureDidOpen: jest.fn().mockResolvedValue(undefined),
-    waitForDiagnosticsPublish: jest.fn().mockResolvedValue(undefined)
+    waitForDiagnosticsPublish: jest.fn().mockResolvedValue(undefined),
+    ensureSeedFileOpen: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -306,6 +310,7 @@ interface MockClient {
   getCapabilities: jest.Mock<Record<string, unknown>, []>;
   ensureDidOpen: jest.Mock<Promise<void>, [string]>;
   waitForDiagnosticsPublish: jest.Mock<Promise<void>, [string, number]>;
+  ensureSeedFileOpen: jest.Mock<Promise<void>, [string[]]>;
 }
 
 interface MockLifecycle {
@@ -315,4 +320,5 @@ interface MockLifecycle {
   getWorkspaceDiagnostics: jest.Mock<[], [string?]>;
   getHealth: jest.Mock<[], []>;
   ensureLanguageForFile: jest.Mock<Promise<void>, [string]>;
+  ensureSeedFilesOpen: jest.Mock<Promise<void>, []>;
 }

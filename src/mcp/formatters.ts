@@ -136,7 +136,7 @@ export function formatSymbols(symbols: Array<DocumentSymbol | SymbolInformation>
 
 export function formatDiagnostics(diagnostics: DiagnosticWithUri[] | null, scope: 'file' | 'workspace'): string {
   if (!diagnostics || diagnostics.length === 0) {
-    return 'No result';
+    return scope === 'workspace' ? 'No diagnostics found in workspace' : 'No diagnostics found';
   }
 
   const grouped = new Map<number, DiagnosticWithUri[]>();

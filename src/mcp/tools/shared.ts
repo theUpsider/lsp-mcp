@@ -21,6 +21,7 @@ export interface MinimalLspClient {
   getCapabilities(): unknown;
   ensureDidOpen(filePath: string): Promise<void>;
   waitForDiagnosticsPublish(filePath: string, timeoutMs: number): Promise<void>;
+  ensureSeedFileOpen(extensions: string[]): Promise<void>;
 }
 
 export interface MinimalLifecycleManager {
@@ -30,6 +31,7 @@ export interface MinimalLifecycleManager {
   getWorkspaceDiagnostics(language?: string): DiagnosticWithUri[];
   getHealth(): LanguageServerHealth[];
   ensureLanguageForFile(filePath: string): Promise<void>;
+  ensureSeedFilesOpen(): Promise<void>;
 }
 
 export interface McpToolResult {

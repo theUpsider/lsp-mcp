@@ -175,11 +175,13 @@ describe('registerReadTools', () => {
     const registrar = new FakeRegistrar();
     const firstClient = createClient([{ name: 'UserService', kind: 5, location: { uri: 'file:///workspace/src/user.ts', range: { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } } } }]);
     const secondClient = createClient([{ name: 'login', kind: 12, location: { uri: 'file:///workspace/src/auth.ts', range: { start: { line: 1, character: 0 }, end: { line: 1, character: 3 } } } }]);
+    const lifecycle = createLifecycle({ workspaceClients: [firstClient, secondClient] });
 
-    registerReadTools(registrar, createLifecycle({ workspaceClients: [firstClient, secondClient] }), { initializeManager: jest.fn() });
+    registerReadTools(registrar, lifecycle, { initializeManager: jest.fn() });
 
     const result = await getHandler(registrar, 'lsp_workspace_symbols')({ query: 'log' });
 
+    expect(lifecycle.ensureSeedFilesOpen).toHaveBeenCalledTimes(1);
     expect(firstClient.request).toHaveBeenCalledWith('workspace/symbol', { query: 'log' }, 30000);
     expect(secondClient.request).toHaveBeenCalledWith('workspace/symbol', { query: 'log' }, 30000);
     expect(result).toEqual({
@@ -329,7 +331,8 @@ function createLifecycle(options: {
     getFileDiagnostics: jest.fn((_: string) => (options.diagnostics ?? []).filter((diagnostic) => diagnostic.uri === 'file:///workspace/src/index.ts')),
     getWorkspaceDiagnostics: jest.fn((_: string | undefined) => options.diagnostics ?? []),
     getHealth: jest.fn(() => options.health ?? []),
-    ensureLanguageForFile: jest.fn().mockResolvedValue(undefined)
+    ensureLanguageForFile: jest.fn().mockResolvedValue(undefined),
+    ensureSeedFilesOpen: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -341,7 +344,8 @@ function createClient(result: unknown): MockClient {
     notify: jest.fn(),
     getCapabilities: jest.fn(() => ({ renameProvider: true })),
     ensureDidOpen: jest.fn().mockResolvedValue(undefined),
-    waitForDiagnosticsPublish: jest.fn().mockResolvedValue(undefined)
+    waitForDiagnosticsPublish: jest.fn().mockResolvedValue(undefined),
+    ensureSeedFileOpen: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -351,6 +355,7 @@ interface MockClient {
   getCapabilities: jest.Mock<Record<string, unknown>, []>;
   ensureDidOpen: jest.Mock<Promise<void>, [string]>;
   waitForDiagnosticsPublish: jest.Mock<Promise<void>, [string, number]>;
+  ensureSeedFileOpen: jest.Mock<Promise<void>, [string[]]>;
 }
 
 interface MockLifecycle {
@@ -360,6 +365,7 @@ interface MockLifecycle {
   getWorkspaceDiagnostics: jest.Mock<DiagnosticRecord[], [string?]>;
   getHealth: jest.Mock<LanguageServerHealth[], []>;
   ensureLanguageForFile: jest.Mock<Promise<void>, [string]>;
+  ensureSeedFilesOpen: jest.Mock<Promise<void>, []>;
 }
 
 type DiagnosticRecord = Diagnostic & { uri?: string };

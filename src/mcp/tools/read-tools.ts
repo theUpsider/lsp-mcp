@@ -82,6 +82,7 @@ export function registerReadTools(registrar: ToolRegistrar, lifecycleManager: Mi
 
   registrar.registerTool('lsp_workspace_symbols', { description: 'Search workspace symbols', inputSchema: z.object({ query: z.string().default('') }) }, async (args) => {
     const query = typeof args.query === 'string' ? args.query : '';
+    await lifecycleManager.ensureSeedFilesOpen();
     const results = await Promise.all(lifecycleManager.getReadyClients().map(async (client) => {
       return await client.request('workspace/symbol', { query }, 30000) as SymbolInformation[];
     }));
@@ -100,7 +101,7 @@ export function registerReadTools(registrar: ToolRegistrar, lifecycleManager: Mi
     });
   });
 
-  registrar.registerTool('lsp_diagnostics', { description: 'Show diagnostics', inputSchema: z.object({ file: z.string().optional(), scope: z.enum(['file', 'workspace']).default('file'), language: z.string().optional() }) }, async (args) => {
+  registrar.registerTool('lsp_diagnostics', { description: 'Get errors and warnings. Pass a file path to trigger analysis of that file and its language server, then return diagnostics for that file (scope: file) or all files seen so far (scope: workspace). Omit file for workspace scope to query whatever has been opened previously.', inputSchema: z.object({ file: z.string().optional(), scope: z.enum(['file', 'workspace']).default('file'), language: z.string().optional() }) }, async (args) => {
     const filePath = typeof args.file === 'string' ? args.file : '';
     const scope = args.scope === 'workspace' ? 'workspace' : 'file';
 

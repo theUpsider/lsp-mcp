@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Diagnostic, ServerCapabilities } from 'vscode-languageserver-protocol';
 
 import { detectLanguages } from '../detection/language-detector';
-import { extensionToLanguage } from '../detection/language-registry';
+import { extensionToLanguage, extensionsForLanguage } from '../detection/language-registry';
 
 import { DiagnosticStore } from './diagnostic-store';
 import { LspClient } from './lsp-client';
@@ -84,6 +84,17 @@ export class LifecycleManager {
 
   public getWorkspaceDiagnostics(language?: string): Array<Diagnostic & { uri: string }> {
     return this.store.getForWorkspace(language);
+  }
+
+  public async ensureSeedFilesOpen(): Promise<void> {
+    await Promise.all(
+      Array.from(this.supervisors.entries()).map(async ([language, supervisor]) => {
+        const client = supervisor.getClient();
+        if (!client) return;
+        const extensions = extensionsForLanguage(language);
+        await client.ensureSeedFileOpen(extensions);
+      })
+    );
   }
 
   public async shutdown(): Promise<void> {
