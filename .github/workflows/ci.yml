@@ -40,11 +40,12 @@ jobs:
       - run: npm run build
       - run: npm test
       - name: Generate changelog
-        uses: orhun/git-cliff-action@v3
         id: changelog
-        with:
-          config: .cliff.toml
-          args: --latest
+        run: |
+          npx --yes git-cliff@latest --config .cliff.toml --latest --output CHANGELOG_LATEST.md
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat CHANGELOG_LATEST.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Publish to npm
         run: npm publish --access public
         env:
