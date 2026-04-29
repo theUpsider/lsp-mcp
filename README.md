@@ -1,0 +1,179 @@
+# Universal LSP MCP Server
+
+> One MCP server to rule all Language Servers — automatic language detection, zero-config setup.
+
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/@theupsider/lsp-mcp)](https://www.npmjs.com/package/@theupsider/lsp-mcp)
+[![Node.js](https://img.shields.io/badge/Node.js-20%20%7C%2022%20%7C%2024-brightgreen)](https://nodejs.org)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](https://github.com/theupsider/lsp-mcp)
+
+## Overview
+
+A Model Context Protocol (MCP) server that gives language models access to **Language Server Protocol (LSP)** functionality across all major programming languages. Unlike existing LSP-MCP servers, this project supports **13 languages out of the box** with **zero manual configuration** — it automatically detects your codebase, selects the right language server, and exposes all LSP operations through a stable, language-independent tool interface.
+
+## Supported Languages
+
+| Language   | Language Server              | Auto-Detected Via            |
+| ---------- | ---------------------------- | ---------------------------- |
+| Python     | `pyright` / `pylsp`          | `pyproject.toml`, `setup.py` |
+| TypeScript | `typescript-language-server` | `tsconfig.json`              |
+| JavaScript | `typescript-language-server` | `package.json`               |
+| C#         | `omnisharp`                  | `*.csproj`, `*.sln`          |
+| Java       | `vscode-java` / `jdtls`      | `pom.xml`, `build.gradle`    |
+| Go         | `gopls`                      | `go.mod`                     |
+| Rust       | `rust-analyzer`              | `Cargo.toml`                 |
+| C / C++    | `clangd`                     | `*.c`, `*.cpp`, `*.h`        |
+| Ruby       | `solargraph`                 | `Gemfile`                    |
+| PHP        | `intelephense`               | `composer.json`              |
+| Kotlin     | `kotlin-language-server`     | `build.gradle.kts`           |
+| Swift      | `sourcekit-lsp`              | `Package.swift`              |
+
+## Features
+
+- **🔍 Automatic Language Detection** — Scans project root for language markers (`package.json`, `Cargo.toml`, `go.mod`, etc.)
+- **🔄 Auto Language Server Selection** — Hardcoded mapping with fallback servers; installs missing LSPs automatically
+- **🛠 19 LSP Tools** — Hover, definition, references, completions, diagnostics, rename, code actions, formatting, and more
+- **📝 Read & Write Operations** — Both inspection and modification of code via LSP
+- **🌐 Polyglot Support** — Multiple language servers run simultaneously in the same project
+- **📋 Hybrid Responses** — Human-readable `text` field + raw LSP data in `raw` field
+- **🔌 MCP Stdio Protocol** — Works with any MCP-compatible client
+- **⚡ Zero Config** — Install and run, no per-language setup required
+
+## Installation
+
+```bash
+# npm
+npm install -g @theupsider/lsp-mcp
+
+# bun
+bun install -g @theupsider/lsp-mcp
+```
+
+## Quickstart
+
+```bash
+# Set the project root
+export LSP_MCP_ROOT=/path/to/your/project
+
+# Run the server (reads from stdin, writes to stdout)
+lsp-mcp
+```
+
+The server will:
+
+1. Scan `LSP_MCP_ROOT` for language markers
+2. Detect all supported languages in the project
+3. Start the appropriate language servers automatically
+4. Begin listening for MCP requests on stdin
+
+## Available Tools
+
+### Read-Only Tools
+
+| Tool                    | Description                     | Key Parameters                        |
+| ----------------------- | ------------------------------- | ------------------------------------- |
+| `lsp_hover`             | Show type info / documentation  | `file`, `line`, `character`           |
+| `lsp_definition`        | Go to definition                | `file`, `line`, `character`           |
+| `lsp_references`        | Find all references             | `file`, `line`, `character`           |
+| `lsp_document_symbols`  | List symbols in a file          | `file`                                |
+| `lsp_workspace_symbols` | Search symbols across workspace | `query` (limit: 100–500 results)      |
+| `lsp_completion`        | Code completion suggestions     | `file`, `line`, `character`           |
+| `lsp_diagnostics`       | Get errors & warnings           | `file` (scope: `file` or `workspace`) |
+| `lsp_signature_help`    | Function signature help         | `file`, `line`, `character`           |
+| `lsp_type_definition`   | Go to type definition           | `file`, `line`, `character`           |
+| `lsp_implementation`    | Find implementations            | `file`, `line`, `character`           |
+| `lsp_health`            | Check status of all LSP servers | _(none)_                              |
+
+### Write Tools
+
+| Tool                       | Description               | Key Parameters                         |
+| -------------------------- | ------------------------- | -------------------------------------- |
+| `lsp_rename`               | Rename symbol             | `file`, `line`, `character`, `newName` |
+| `lsp_code_action`          | Apply / list code actions | `file`, `line`, `character`, `apply`   |
+| `lsp_formatting`           | Format document           | `file`                                 |
+| `lsp_range_formatting`     | Format code range         | `file`, `range`                        |
+| `lsp_apply_workspace_edit` | Apply raw workspace edit  | `edit` (WorkspaceEdit object)          |
+
+## Configuration
+
+| Environment Variable | Description                         | Default      |
+| -------------------- | ----------------------------------- | ------------ |
+| `LSP_MCP_ROOT`       | Project root directory              | _(required)_ |
+| `LSP_MCP_LOG_LEVEL`  | Log level: `error`, `info`, `debug` | `info`       |
+
+## Setup Scripts
+
+Two helper scripts are included for setting up a development environment:
+
+- **`setup-languages-ubuntu24.sh`** — Installs all language runtimes, compilers, and toolchains on Ubuntu 24.04 (Python, Node.js, Java, Go, Rust, Ruby, PHP, Kotlin, Swift, etc.)
+- **`setup-lsp.sh`** — Installs all language servers (pyright, typescript-language-server, omnisharp, jdtls, gopls, rust-analyzer, clangd, solargraph, intelephense, kotlin-language-server)
+
+```bash
+# 1. Install language runtimes
+chmod +x setup-languages-ubuntu24.sh
+./setup-languages-ubuntu24.sh
+
+# 2. Install language servers
+chmod +x setup-lsp.sh
+./setup-lsp.sh
+
+# 3. Reload PATH
+source ~/.bashrc
+```
+
+## Troubleshooting
+
+### Language server not found
+
+If a language server cannot be auto-installed, the server logs a structured error and continues running for other languages. Manually install the missing server:
+
+```bash
+# Python
+pipx install python-lsp-server
+
+# C#
+dotnet tool install -g omnisharp-roslyn
+
+# Java
+npm install -g vscode-java
+
+# Ruby
+gem install solargraph
+```
+
+### Server not detecting language
+
+Ensure your project root contains a language marker file (e.g., `package.json` for TypeScript, `Cargo.toml` for Rust). The server scans the `LSP_MCP_ROOT` directory for these markers.
+
+### High memory usage
+
+Each language server runs as a separate process. For large projects with many languages, consider limiting the workspace or using `LSP_MCP_LOG_LEVEL=info` to monitor server health.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│           MCP Client (AI Model)             │
+└──────────────────┬──────────────────────────┘
+                   │ MCP Protocol (stdio)
+                   ▼
+┌─────────────────────────────────────────────┐
+│         LSP MCP Server (Node.js)            │
+│  ┌───────────┐ ┌──────────┐ ┌───────────┐  │
+│  │ lsp_hover │ │ lsp_...  │ │ lsp_...   │  │
+│  └─────┬─────┘ └────┬─────┘ └─────┬─────┘  │
+│        └─────────────┼─────────────┘        │
+│                      ▼                       │
+│          Language Router & Adapter           │
+│  (auto-detects language → selects LSP)       │
+└──────┬──────────┬──────────┬───────────┬─────┘
+       │          │          │           │
+       ▼          ▼          ▼           ▼
+   pyright  typescript  gopls    clangd
+   pylsp    lsp         rust-    ...
+                         analyzer
+```
+
+## License
+
+[Apache-2.0](LICENSE)
