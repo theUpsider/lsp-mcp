@@ -60,6 +60,7 @@ export class LifecycleManager {
   private readonly logLevel: 'error' | 'info' | 'debug';
   private readonly states = new Map<string, LanguageState>();
   private readonly diagnostics = new Map<string, DiagnosticEntry[]>();
+  private shuttingDown = false;
 
   public constructor(projectRoot: string, logLevel: string) {
     this.projectRoot = projectRoot;
@@ -149,6 +150,7 @@ export class LifecycleManager {
   }
 
   public async shutdown(): Promise<void> {
+    this.shuttingDown = true;
     const clients = Array.from(this.states.values()).flatMap((state) => {
       if (state.healthInterval) {
         clearInterval(state.healthInterval);
@@ -195,6 +197,10 @@ export class LifecycleManager {
     const client = new LspClient(serverDef, this.projectRoot, this.logLevel);
     state.client = client;
     client.on('crash', async () => {
+      if (this.shuttingDown) {
+        return;
+      }
+
       await this.restartLanguage(state, `LSP server crashed for ${state.language}`);
     });
     client.on('error', (error) => {

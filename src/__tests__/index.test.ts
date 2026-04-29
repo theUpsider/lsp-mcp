@@ -30,10 +30,11 @@ describe('index entrypoint', () => {
   it('prints version and exits for --version', async () => {
     const stdout = jest.fn();
     const exit = jest.fn();
+    const { version } = jest.requireActual('../../package.json') as { version: string };
 
     await main(['--version'], {}, { stdout, exit });
 
-    expect(stdout).toHaveBeenCalledWith('0.1.0\n');
+    expect(stdout).toHaveBeenCalledWith(`${version}\n`);
     expect(exit).toHaveBeenCalledWith(0);
   });
 

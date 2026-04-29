@@ -76,6 +76,7 @@ export class McpServer {
   }
 
   private configureToolHandlers(): void {
+    this.server.server.registerCapabilities({ tools: {} });
     this.server.server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: this.listTools() }));
     this.server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const toolName = request.params.name;

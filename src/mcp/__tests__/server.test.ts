@@ -1,3 +1,4 @@
+const mockRegisterCapabilities = jest.fn();
 const mockSetRequestHandler = jest.fn();
 const mockConnect = jest.fn().mockResolvedValue(undefined);
 
@@ -5,6 +6,7 @@ jest.mock('@modelcontextprotocol/sdk/server/mcp.js', () => ({
   McpServer: jest.fn().mockImplementation(() => ({
     connect: mockConnect,
     server: {
+      registerCapabilities: mockRegisterCapabilities,
       setRequestHandler: mockSetRequestHandler
     }
   }))
@@ -39,10 +41,11 @@ describe('McpServer', () => {
     jest.clearAllMocks();
   });
 
-  it('registers request handlers and connects on start', async () => {
+  it('registers tool capabilities, request handlers, and connects on start', async () => {
     const server = new McpServer('info');
     await server.start();
 
+    expect(mockRegisterCapabilities).toHaveBeenCalledWith({ tools: {} });
     expect(mockSetRequestHandler).toHaveBeenCalledTimes(2);
     expect(mockConnect).toHaveBeenCalledWith({ kind: 'stdio' });
   });
