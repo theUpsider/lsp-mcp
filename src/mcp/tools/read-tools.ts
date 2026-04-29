@@ -108,8 +108,10 @@ export function registerReadTools(registrar: ToolRegistrar, lifecycleManager: Mi
       await lifecycleManager.ensureLanguageForFile(filePath);
       const client = lifecycleManager.getClientForFile(filePath);
       if (client) {
+        const waitPromise = client.waitForDiagnosticsPublish(filePath, 10000);
         await client.ensureDidOpen(filePath);
-        await client.waitForDiagnosticsPublish(filePath, 3000);
+        client.notify('textDocument/didSave', { textDocument: { uri: pathToUri(filePath) } });
+        await waitPromise;
       }
     }
 
