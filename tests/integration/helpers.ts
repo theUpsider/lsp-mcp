@@ -7,7 +7,7 @@ import { getLspCandidates } from '../../src/detection/lsp-mapping';
 import { LspClient } from '../../src/lsp/lsp-client';
 import type { LanguageServerHealth } from '../../src/lsp/lifecycle-manager';
 import { registerReadTools } from '../../src/mcp/tools/read-tools';
-import { clearOpenedFiles, ensureDidOpen, type McpToolResult, type MinimalLifecycleManager, type ToolRegistrar } from '../../src/mcp/tools/shared';
+import { type McpToolResult, type MinimalLifecycleManager, type ToolRegistrar } from '../../src/mcp/tools/shared';
 import { pathToUri } from '../../src/utils/uri';
 
 export interface TmpProject {
@@ -104,7 +104,6 @@ async function runToolSmokeTest(toolName: SmokeTool, request: SmokeRequest): Pro
     const result = await waitForMeaningfulResult(toolName, client, request.language, project.file, request.line, request.character);
     return result;
   } finally {
-    clearOpenedFiles();
     if (client) {
       await client.shutdown().catch(() => undefined);
       await delay(1500);
@@ -144,7 +143,7 @@ async function invokeTool(toolName: SmokeTool, client: LspClient, language: stri
   }
 
   if (language === 'rust') {
-    await ensureDidOpen(client, file);
+    await client.ensureDidOpen(file);
     client.notify('textDocument/didSave', { textDocument: { uri: pathToUri(file) } });
   }
 

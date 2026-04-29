@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 
 import { registerReadTools } from '../tools/read-tools';
 
@@ -8,7 +8,6 @@ import type { LanguageServerHealth } from '../../lsp/lifecycle-manager';
 import type { Diagnostic } from 'vscode-languageserver-protocol';
 
 jest.mock('node:fs/promises', () => ({
-  readFile: jest.fn(),
   stat: jest.fn()
 }));
 
@@ -28,7 +27,6 @@ class FakeRegistrar {
 describe('registerReadTools', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (readFile as jest.MockedFunction<typeof readFile>).mockResolvedValue('const foo = 1;');
     (stat as jest.MockedFunction<typeof stat>).mockResolvedValue({ isDirectory: () => true } as Awaited<ReturnType<typeof stat>>);
   });
 
@@ -123,10 +121,8 @@ describe('registerReadTools', () => {
     const hover = await getHandler(registrar, 'lsp_hover')({ file: '/workspace/src/index.ts', line: 2, character: 4 });
     await getHandler(registrar, 'lsp_hover')({ file: '/workspace/src/index.ts', line: 2, character: 4 });
 
-    expect(readFile).toHaveBeenCalledTimes(1);
-    expect(client.notify).toHaveBeenCalledWith('textDocument/didOpen', expect.objectContaining({
-      textDocument: expect.objectContaining({ uri: 'file:///workspace/src/index.ts', text: 'const foo = 1;' })
-    }));
+    expect(client.ensureDidOpen).toHaveBeenCalledTimes(2);
+    expect(client.ensureDidOpen).toHaveBeenCalledWith('/workspace/src/index.ts');
     expect(client.request).toHaveBeenCalledWith('textDocument/hover', {
       textDocument: { uri: 'file:///workspace/src/index.ts' },
       position: { line: 2, character: 4 }
@@ -343,7 +339,8 @@ function createClient(result: unknown): MockClient {
       ? jest.fn().mockRejectedValue(result)
       : jest.fn().mockResolvedValue(result),
     notify: jest.fn(),
-    getCapabilities: jest.fn(() => ({ renameProvider: true }))
+    getCapabilities: jest.fn(() => ({ renameProvider: true })),
+    ensureDidOpen: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -351,6 +348,7 @@ interface MockClient {
   request: jest.Mock<Promise<unknown>, [string, unknown, number]>;
   notify: jest.Mock<void, [string, unknown]>;
   getCapabilities: jest.Mock<Record<string, unknown>, []>;
+  ensureDidOpen: jest.Mock<Promise<void>, [string]>;
 }
 
 interface MockLifecycle {

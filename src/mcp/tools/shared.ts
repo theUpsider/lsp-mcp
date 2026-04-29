@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { Diagnostic, DocumentSymbol, Location, SymbolInformation } from 'vscode-languageserver-protocol';
@@ -6,7 +5,7 @@ import type { ZodType } from 'zod';
 
 import type { LanguageServerHealth } from '../../lsp/lifecycle-manager';
 
-import { pathToUri, uriToPath } from '../../utils/uri';
+import { uriToPath } from '../../utils/uri';
 
 export interface ToolRegistrar {
   registerTool(
@@ -20,6 +19,7 @@ export interface MinimalLspClient {
   request(method: string, params: unknown, timeout: number): Promise<unknown>;
   notify(method: string, params: unknown): void;
   getCapabilities(): unknown;
+  ensureDidOpen(filePath: string): Promise<void>;
 }
 
 export interface MinimalLifecycleManager {
@@ -41,35 +41,12 @@ export interface McpToolResult {
 
 export type DiagnosticWithUri = Diagnostic & { uri?: string };
 
-const openedFiles = new Set<string>();
-
 export function success(text: string, raw: unknown): McpToolResult {
   return { content: [{ type: 'text', text }], raw };
 }
 
 export function failure(text: string, raw: unknown = null): McpToolResult {
   return { content: [{ type: 'text', text }], error: true, raw };
-}
-
-export async function ensureDidOpen(client: MinimalLspClient, filePath: string): Promise<void> {
-  if (openedFiles.has(filePath)) {
-    return;
-  }
-
-  const text = await readFile(filePath, 'utf8');
-  client.notify('textDocument/didOpen', {
-    textDocument: {
-      uri: pathToUri(filePath),
-      languageId: languageIdForFile(filePath),
-      version: 1,
-      text
-    }
-  });
-  openedFiles.add(filePath);
-}
-
-export function clearOpenedFiles(): void {
-  openedFiles.clear();
 }
 
 export function noServerResult(filePath: string): McpToolResult {
@@ -125,26 +102,3 @@ export function normalizeSymbols(symbols: Array<DocumentSymbol | SymbolInformati
   return normalized;
 }
 
-function languageIdForFile(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  const languageMap: Record<string, string> = {
-    '.ts': 'typescript',
-    '.tsx': 'typescriptreact',
-    '.js': 'javascript',
-    '.jsx': 'javascriptreact',
-    '.py': 'python',
-    '.go': 'go',
-    '.rs': 'rust',
-    '.java': 'java',
-    '.cs': 'csharp',
-    '.php': 'php',
-    '.rb': 'ruby',
-    '.kt': 'kotlin',
-    '.swift': 'swift',
-    '.c': 'c',
-    '.cpp': 'cpp',
-    '.h': 'c'
-  };
-
-  return languageMap[ext] ?? 'plaintext';
-}

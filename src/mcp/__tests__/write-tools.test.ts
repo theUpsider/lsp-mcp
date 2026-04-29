@@ -1,6 +1,5 @@
 import { access, readFile, writeFile } from 'node:fs/promises';
 
-import { clearOpenedFiles } from '../tools/shared';
 import { registerWriteTools } from '../tools/write-tools';
 
 jest.mock('node:fs/promises', () => ({
@@ -24,7 +23,6 @@ class FakeRegistrar {
 describe('registerWriteTools', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    clearOpenedFiles();
     (access as jest.MockedFunction<typeof access>).mockResolvedValue(undefined);
     (readFile as jest.MockedFunction<typeof readFile>).mockImplementation(async (filePath) => {
       const pathText = String(filePath);
@@ -296,7 +294,8 @@ function createClient(result: unknown, capabilities: Record<string, unknown> = {
       return result;
     }),
     notify: jest.fn(),
-    getCapabilities: jest.fn(() => capabilities)
+    getCapabilities: jest.fn(() => capabilities),
+    ensureDidOpen: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -304,6 +303,7 @@ interface MockClient {
   request: jest.Mock<Promise<unknown>, [string, unknown, number]>;
   notify: jest.Mock<void, [string, unknown]>;
   getCapabilities: jest.Mock<Record<string, unknown>, []>;
+  ensureDidOpen: jest.Mock<Promise<void>, [string]>;
 }
 
 interface MockLifecycle {

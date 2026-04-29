@@ -5,8 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import { LifecycleManager } from '../lsp/lifecycle-manager';
-import { failure, noProjectRootResult, type McpToolResult, type MinimalLifecycleManager } from './tools/shared';
-import type { ZodType } from 'zod';
+import { failure, noProjectRootResult, type McpToolResult, type MinimalLifecycleManager, type ToolRegistrar } from './tools/shared';
 
 import { registerReadTools } from './tools/read-tools';
 import { registerWriteTools } from './tools/write-tools';
@@ -28,11 +27,10 @@ export class McpServer {
 
   public async start(): Promise<void> {
     const lifecycleProxy = this.createLifecycleProxy();
-    const registrar: ToolRegistrationAdapter = {
+    const registrar: ToolRegistrar = {
       registerTool: (name, config, handler) => {
         this.tools.set(name, { name, description: config.description, inputSchema: config.inputSchema, handler });
-      },
-      fromJsonSchema: (schema) => schema
+      }
     };
 
     registerReadTools(registrar, lifecycleProxy, { initializeManager: async (root, languages) => await this.initializeManager(root, languages) });
@@ -134,15 +132,6 @@ export class McpServer {
 }
 
 type LifecycleManagerFactory = (root: string, logLevel: string) => LifecycleManager;
-
-interface ToolRegistrationAdapter {
-  registerTool(
-    name: string,
-    config: { description?: string; inputSchema?: ZodType },
-    handler: (args: Record<string, unknown>) => Promise<McpToolResult>
-  ): void;
-  fromJsonSchema(schema: unknown): unknown;
-}
 
 interface RegisteredToolDefinition {
   name: string;

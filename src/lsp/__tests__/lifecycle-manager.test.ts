@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 
 import { LifecycleManager } from '../lifecycle-manager';
+import { ServerSupervisor } from '../server-supervisor';
 
 import type { DetectedLanguage } from '../../detection/language-detector';
 import type { LspCandidate } from '../../detection/lsp-mapping';
@@ -279,29 +280,16 @@ describe('LifecycleManager', () => {
     const manager = new LifecycleManager('/workspace/project', 'debug');
     await manager.start();
 
-    const managerAccess = manager as unknown as {
-      states: Map<string, {
-        restartCount: number;
-        client: MockLspClient | null;
-        status: 'ready' | 'error' | 'starting';
-        error?: string;
-      }>;
-      restartLanguage: (state: {
-        restartCount: number;
-        client: MockLspClient | null;
-        status: 'ready' | 'error' | 'starting';
-        error?: string;
-      }, reason: string) => Promise<void>;
-    };
-    const state = managerAccess.states.get('typescript');
+    const managerAccess = manager as unknown as { supervisors: Map<string, ServerSupervisor> };
+    const supervisor = managerAccess.supervisors.get('typescript');
 
-    expect(state).toBeDefined();
-    if (!state) {
-      throw new Error('Expected typescript state');
+    expect(supervisor).toBeDefined();
+    if (!supervisor) {
+      throw new Error('Expected typescript supervisor');
     }
 
-    state.restartCount = 3;
-    await managerAccess.restartLanguage(state, 'too many restarts');
+    supervisor.restartCount = 3;
+    await supervisor.restart('too many restarts');
 
     expect(manager.getClient('typescript')).toBeNull();
     expect(manager.getHealth()).toEqual([

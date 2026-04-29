@@ -1,6 +1,8 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 
+import { extensionsForLanguage } from './language-registry';
+
 export interface DetectedLanguage {
   language: string;
   confidence: 'marker' | 'extension';
@@ -21,10 +23,7 @@ const MARKER_DEFINITIONS: Array<{ language: string; markers: string[]; }> = [
   { language: 'swift', markers: ['Package.swift'] }
 ];
 
-const EXTENSION_DEFINITIONS: Array<{ language: string; extensions: string[]; }> = [
-  { language: 'c', extensions: ['.c', '.h'] },
-  { language: 'cpp', extensions: ['.cpp', '.hpp', '.cc'] }
-];
+const EXTENSION_LANGUAGES = ['c', 'cpp'] as const;
 
 export async function detectLanguages(projectRoot: string): Promise<DetectedLanguage[]> {
   const entries = await collectEntries(projectRoot, projectRoot);
@@ -75,15 +74,16 @@ export async function detectLanguages(projectRoot: string): Promise<DetectedLang
     }
   }
 
-  for (const definition of EXTENSION_DEFINITIONS) {
+  for (const language of EXTENSION_LANGUAGES) {
+    const extensions = extensionsForLanguage(language);
     const matches = entries
-      .filter((entry) => definition.extensions.some((extension) => entry.relativePath.endsWith(extension)))
+      .filter((entry) => extensions.some((extension) => entry.relativePath.endsWith(extension)))
       .map((entry) => entry.relativePath)
-      .sort((left, right) => compareByExtensionPriority(left, right, definition.extensions));
+      .sort((left, right) => compareByExtensionPriority(left, right, extensions));
 
     if (matches.length > 0) {
       detected.push({
-        language: definition.language,
+        language,
         confidence: 'extension',
         markers: matches
       });

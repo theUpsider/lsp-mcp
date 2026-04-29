@@ -5,7 +5,7 @@ import type { CodeAction, Range, TextEdit, WorkspaceEdit } from 'vscode-language
 import { z } from 'zod';
 
 import { pathToUri, uriToPath } from '../../utils/uri';
-import { ensureDidOpen, failure, mapToolError, noServerResult, success, type MinimalLifecycleManager, type MinimalLspClient, type ToolRegistrar } from './shared';
+import { failure, mapToolError, noServerResult, success, type MinimalLifecycleManager, type MinimalLspClient, type ToolRegistrar } from './shared';
 
 export function registerWriteTools(registrar: ToolRegistrar, lifecycleManager: MinimalLifecycleManager): void {
   registrar.registerTool('lsp_rename', { description: 'Rename symbol', inputSchema: z.object({ file: z.string(), line: z.number().int(), character: z.number().int(), newName: z.string() }) }, async (args) => {
@@ -21,7 +21,7 @@ export function registerWriteTools(registrar: ToolRegistrar, lifecycleManager: M
     }
 
     try {
-      await ensureDidOpen(client, filePath);
+      await client.ensureDidOpen(filePath);
       const edit = await client.request('textDocument/rename', {
         textDocument: { uri: pathToUri(filePath) },
         position: getPosition(args),
@@ -42,7 +42,7 @@ export function registerWriteTools(registrar: ToolRegistrar, lifecycleManager: M
     }
 
     try {
-      await ensureDidOpen(client, filePath);
+      await client.ensureDidOpen(filePath);
       const range = isRange(args.range)
         ? args.range
         : { start: getPosition(args), end: getPosition(args) };
@@ -122,7 +122,7 @@ async function runFormattingRequest(
   }
 
   try {
-    await ensureDidOpen(client, filePath);
+    await client.ensureDidOpen(filePath);
     const options = await resolveFormattingOptions(filePath, args.options);
     const edits = await requestEdits(client, filePath, options);
     return await applyTextEdits(edits, [filePath], lifecycleManager, client);
@@ -147,7 +147,7 @@ async function applyWorkspaceEdit(
   for (const [uri, edits] of changeEntries) {
     const filePath = uriToPath(uri);
     const client = lifecycleManager.getClientForFile(filePath) ?? fallbackClient;
-    await ensureDidOpen(client, filePath);
+    await client.ensureDidOpen(filePath);
     await applyEditsToFile(filePath, edits ?? []);
     client.notify('textDocument/didSave', { textDocument: { uri } });
     changedFiles.push(filePath);
@@ -157,7 +157,7 @@ async function applyWorkspaceEdit(
     if ('textDocument' in change && 'edits' in change) {
       const filePath = uriToPath(change.textDocument.uri);
       const client = lifecycleManager.getClientForFile(filePath) ?? fallbackClient;
-      await ensureDidOpen(client, filePath);
+      await client.ensureDidOpen(filePath);
       await applyEditsToFile(filePath, change.edits);
       client.notify('textDocument/didSave', { textDocument: { uri: change.textDocument.uri } });
       changedFiles.push(filePath);

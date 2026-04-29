@@ -1,10 +1,12 @@
 import { EventEmitter } from 'node:events';
+import { readFile } from 'node:fs/promises';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import path from 'node:path';
 
 import type { LspCandidate } from '../detection/lsp-mapping';
 import type { InitializeResult } from 'vscode-languageserver-protocol';
 
+import { extensionToLanguageId } from '../detection/language-registry';
 import { pathToUri } from '../utils/uri';
 
 type LogLevel = 'error' | 'info' | 'debug';
@@ -59,6 +61,7 @@ export class LspClient extends EventEmitter {
   private exitExpected = false;
   private initializeResult: InitializeResult | null = null;
   private forcedKillTimer: NodeJS.Timeout | null = null;
+  private readonly openedFiles = new Set<string>();
 
   public constructor(serverDef: LspCandidate, projectRoot: string, logLevel: LogLevel) {
     super();
@@ -169,6 +172,23 @@ export class LspClient extends EventEmitter {
 
   public getCapabilities(): InitializeResult['capabilities'] | null {
     return this.initializeResult?.capabilities ?? null;
+  }
+
+  public async ensureDidOpen(filePath: string): Promise<void> {
+    if (this.openedFiles.has(filePath)) {
+      return;
+    }
+
+    const text = await readFile(filePath, 'utf8');
+    this.notify('textDocument/didOpen', {
+      textDocument: {
+        uri: pathToUri(filePath),
+        languageId: extensionToLanguageId(path.extname(filePath)),
+        version: 1,
+        text
+      }
+    });
+    this.openedFiles.add(filePath);
   }
 
   private sendMessage(message: JsonRpcMessage): void {

@@ -16,7 +16,6 @@ import {
 import { pathToUri } from '../../utils/uri';
 
 import {
-  ensureDidOpen,
   failure,
   mapToolError,
   noServerResult,
@@ -219,7 +218,7 @@ async function runFileRequest<T>(options: {
   const uri = pathToUri(filePath);
 
   try {
-    await ensureDidOpen(client, filePath);
+    await client.ensureDidOpen(filePath);
     const result = await client.request(options.method, options.params?.(uri, position) ?? {
       textDocument: { uri },
       position
