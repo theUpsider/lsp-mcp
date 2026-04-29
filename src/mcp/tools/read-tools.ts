@@ -101,14 +101,24 @@ export function registerReadTools(registrar: ToolRegistrar, lifecycleManager: Mi
   });
 
   registrar.registerTool('lsp_diagnostics', { description: 'Show diagnostics', inputSchema: z.object({ file: z.string().optional(), scope: z.enum(['file', 'workspace']).default('file'), language: z.string().optional() }) }, async (args) => {
+    const filePath = typeof args.file === 'string' ? args.file : '';
     const scope = args.scope === 'workspace' ? 'workspace' : 'file';
+
+    if (filePath) {
+      await lifecycleManager.ensureLanguageForFile(filePath);
+      const client = lifecycleManager.getClientForFile(filePath);
+      if (client) {
+        await client.ensureDidOpen(filePath);
+        await client.waitForDiagnosticsPublish(filePath, 3000);
+      }
+    }
+
     if (scope === 'workspace') {
       const language = typeof args.language === 'string' ? args.language : undefined;
       const diagnostics = lifecycleManager.getWorkspaceDiagnostics(language).slice(0, 200);
       return success(formatDiagnostics(diagnostics, 'workspace'), diagnostics);
     }
 
-    const filePath = typeof args.file === 'string' ? args.file : '';
     const diagnostics = lifecycleManager.getFileDiagnostics(filePath);
     return success(formatDiagnostics(diagnostics, 'file'), diagnostics);
   });

@@ -30,6 +30,8 @@ class MockLspClient extends EventEmitter {
   public readonly request = jest.fn<Promise<unknown>, [string, unknown, number]>().mockResolvedValue({ items: [] });
   public readonly isReady = jest.fn<boolean, []>().mockReturnValue(true);
   public readonly getCapabilities = jest.fn<ServerCapabilities | null, []>().mockReturnValue({ hoverProvider: true });
+  public readonly ensureDidOpen = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+  public readonly waitForDiagnosticsPublish = jest.fn<Promise<void>, [string, number]>().mockResolvedValue(undefined);
 }
 
 describe('LifecycleManager', () => {
@@ -143,7 +145,7 @@ describe('LifecycleManager', () => {
     const LspClient = jest.requireMock('../lsp-client').LspClient as jest.MockedClass<typeof import('../lsp-client').LspClient>;
 
     const firstClient = new MockLspClient();
-    firstClient.request.mockRejectedValueOnce(new Error('ping timeout'));
+    firstClient.isReady.mockReturnValue(false);
     const secondClient = new MockLspClient();
 
     detectLanguages.mockResolvedValue([{ language: 'typescript', confidence: 'marker', markers: ['tsconfig.json'] }]);
@@ -157,7 +159,7 @@ describe('LifecycleManager', () => {
 
     await jest.advanceTimersByTimeAsync(30000);
 
-    expect(firstClient.request).toHaveBeenCalledWith('workspace/symbol', { query: '__lsp_mcp_healthcheck__' }, 5000);
+    expect(firstClient.isReady).toHaveBeenCalled();
     expect(secondClient.start).toHaveBeenCalled();
     expect(manager.getClient('typescript')).toBe(secondClient);
 

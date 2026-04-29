@@ -174,6 +174,24 @@ export class LspClient extends EventEmitter {
     return this.initializeResult?.capabilities ?? null;
   }
 
+  public waitForDiagnosticsPublish(filePath: string, timeoutMs: number): Promise<void> {
+    const uri = pathToUri(filePath);
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, timeoutMs);
+      const handler = (method: string, params: unknown): void => {
+        if (method === 'textDocument/publishDiagnostics') {
+          const p = params as { uri?: string };
+          if (p?.uri === uri) {
+            clearTimeout(timer);
+            this.off('notification', handler);
+            resolve();
+          }
+        }
+      };
+      this.on('notification', handler);
+    });
+  }
+
   public async ensureDidOpen(filePath: string): Promise<void> {
     if (this.openedFiles.has(filePath)) {
       return;

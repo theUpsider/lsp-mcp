@@ -153,11 +153,8 @@ export class ServerSupervisor {
       return;
     }
 
-    try {
-      await this.client.request('workspace/symbol', { query: '__lsp_mcp_healthcheck__' }, 5000);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'LSP health check failed';
-      await this.restart(message);
+    if (!this.client.isReady()) {
+      await this.restart('LSP client lost ready state');
     }
   }
 

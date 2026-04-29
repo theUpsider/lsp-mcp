@@ -20,6 +20,7 @@ export interface MinimalLspClient {
   notify(method: string, params: unknown): void;
   getCapabilities(): unknown;
   ensureDidOpen(filePath: string): Promise<void>;
+  waitForDiagnosticsPublish(filePath: string, timeoutMs: number): Promise<void>;
 }
 
 export interface MinimalLifecycleManager {

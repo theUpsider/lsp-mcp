@@ -340,7 +340,8 @@ function createClient(result: unknown): MockClient {
       : jest.fn().mockResolvedValue(result),
     notify: jest.fn(),
     getCapabilities: jest.fn(() => ({ renameProvider: true })),
-    ensureDidOpen: jest.fn().mockResolvedValue(undefined)
+    ensureDidOpen: jest.fn().mockResolvedValue(undefined),
+    waitForDiagnosticsPublish: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -349,6 +350,7 @@ interface MockClient {
   notify: jest.Mock<void, [string, unknown]>;
   getCapabilities: jest.Mock<Record<string, unknown>, []>;
   ensureDidOpen: jest.Mock<Promise<void>, [string]>;
+  waitForDiagnosticsPublish: jest.Mock<Promise<void>, [string, number]>;
 }
 
 interface MockLifecycle {
