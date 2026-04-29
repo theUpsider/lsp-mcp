@@ -1,9 +1,10 @@
 {
   "name": "@theupsider/lsp-mcp",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Universal LSP MCP server",
   "license": "Apache-2.0",
   "type": "commonjs",
+  "mcpName": "io.github.theupsider/lsp-mcp",
   "author": {
     "name": "David Fischer",
     "url": "https://davidfischer.dev"
@@ -13,7 +14,8 @@
     "lsp-mcp": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "mcp.json"
   ],
   "scripts": {
     "build": "tsc",

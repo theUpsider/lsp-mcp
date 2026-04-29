@@ -53,6 +53,26 @@ bun install -g @theupsider/lsp-mcp
 
 ## Quickstart
 
+### VS Code / Cursor
+
+Add to your **workspace** `.vscode/mcp.json` (recommended — ensures the server runs on the same machine as your code, including SSH remotes, WSL, and Dev Containers):
+
+```json
+{
+  "servers": {
+    "lsp-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@theupsider/lsp-mcp"]
+    }
+  }
+}
+```
+
+> **Why workspace config?** VS Code runs servers defined in `.vscode/mcp.json` wherever the workspace lives. Servers defined in your user profile always run locally — which breaks LSP when your code is on a remote machine.
+
+### CLI
+
 ```bash
 # Run the server (reads from stdin, writes to stdout)
 lsp-mcp
