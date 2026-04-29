@@ -1,14 +1,8 @@
-jest.mock('../lsp/lifecycle-manager', () => ({
-  LifecycleManager: jest.fn().mockImplementation(() => ({
-    start: jest.fn().mockResolvedValue(undefined),
-    shutdown: jest.fn().mockResolvedValue(undefined),
-    getHealth: jest.fn().mockReturnValue([{ language: 'typescript', status: 'ready' }])
-  }))
-}));
-
 jest.mock('../mcp/server', () => ({
   McpServer: jest.fn().mockImplementation(() => ({
-    start: jest.fn().mockResolvedValue(undefined)
+    start: jest.fn().mockResolvedValue(undefined),
+    initializeManager: jest.fn().mockResolvedValue({ root: '/workspace', health: [{ language: 'typescript', status: 'ready' }] }),
+    shutdown: jest.fn().mockResolvedValue(undefined)
   }))
 }));
 
@@ -19,14 +13,18 @@ describe('index entrypoint', () => {
     jest.clearAllMocks();
   });
 
-  it('exits with code 1 when LSP_MCP_ROOT is missing', async () => {
+  it('starts and waits for lsp_init when LSP_MCP_ROOT is missing', async () => {
     const stderr = jest.fn();
     const exit = jest.fn();
+    const McpServer = jest.requireMock('../mcp/server').McpServer as jest.Mock;
 
     await main([], {}, { stderr, exit });
 
-    expect(stderr).toHaveBeenCalledWith('LSP_MCP_ROOT is required\n');
-    expect(exit).toHaveBeenCalledWith(1);
+    const serverInstance = McpServer.mock.results[0]?.value;
+    expect(stderr).toHaveBeenCalledWith(`${JSON.stringify({ event: 'startup', status: 'waiting-for-init' })}\n`);
+    expect(serverInstance.initializeManager).not.toHaveBeenCalled();
+    expect(serverInstance.start).toHaveBeenCalledTimes(1);
+    expect(exit).not.toHaveBeenCalled();
   });
 
   it('prints version and exits for --version', async () => {
@@ -42,12 +40,13 @@ describe('index entrypoint', () => {
   it('boots lifecycle, logs startup report, and starts the MCP server', async () => {
     const stderr = jest.fn();
     const onSignal = jest.fn();
-    const LifecycleManager = jest.requireMock('../lsp/lifecycle-manager').LifecycleManager as jest.Mock;
     const McpServer = jest.requireMock('../mcp/server').McpServer as jest.Mock;
 
     await main([], { LSP_MCP_ROOT: '/workspace', LSP_MCP_LOG_LEVEL: 'debug' }, { stderr, onSignal });
 
-    expect(LifecycleManager).toHaveBeenCalledWith('/workspace', 'debug');
+    const serverInstance = McpServer.mock.results[0]?.value;
+    expect(McpServer).toHaveBeenCalledWith('debug');
+    expect(serverInstance.initializeManager).toHaveBeenCalledWith('/workspace');
     expect(stderr).toHaveBeenCalledWith(`${JSON.stringify({ languages: ['typescript'], started: ['typescript'], errors: [] })}\n`);
     expect(McpServer).toHaveBeenCalledTimes(1);
     expect(onSignal).toHaveBeenCalledTimes(2);

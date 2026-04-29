@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 
 import { registerReadTools } from '../tools/read-tools';
 
@@ -8,7 +8,8 @@ import type { LanguageServerHealth } from '../../lsp/lifecycle-manager';
 import type { Diagnostic } from 'vscode-languageserver-protocol';
 
 jest.mock('node:fs/promises', () => ({
-  readFile: jest.fn()
+  readFile: jest.fn(),
+  stat: jest.fn()
 }));
 
 interface RegisteredTool {
@@ -28,6 +29,88 @@ describe('registerReadTools', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (readFile as jest.MockedFunction<typeof readFile>).mockResolvedValue('const foo = 1;');
+    (stat as jest.MockedFunction<typeof stat>).mockResolvedValue({ isDirectory: () => true } as Awaited<ReturnType<typeof stat>>);
+  });
+
+  it('initializes LSP with a valid root and reports health', async () => {
+    const registrar = new FakeRegistrar();
+    const initializeManager = jest.fn().mockResolvedValue({
+      root: '/workspace',
+      health: [
+        { language: 'typescript', status: 'ready' },
+        { language: 'python', status: 'error', error: 'missing pylsp' }
+      ]
+    });
+
+    registerReadTools(registrar, createLifecycle({ fileClient: null }), { initializeManager });
+
+    await expect(getHandler(registrar, 'lsp_init')({ root: '/workspace' })).resolves.toEqual({
+      content: [{ type: 'text', text: 'Initialized LSP for /workspace. Detected languages: Typescript, Python. LSP servers: 1 started, 1 errors.' }],
+      text: 'Initialized LSP for /workspace. Detected languages: Typescript, Python. LSP servers: 1 started, 1 errors.',
+      raw: {
+        root: '/workspace',
+        languages: ['Typescript', 'Python'],
+        health: [
+          { language: 'typescript', status: 'ready' },
+          { language: 'python', status: 'error', error: 'missing pylsp' }
+        ]
+      }
+    });
+    expect(initializeManager).toHaveBeenCalledWith('/workspace');
+  });
+
+  it('rejects invalid lsp_init roots clearly', async () => {
+    const registrar = new FakeRegistrar();
+    const initializeManager = jest.fn();
+    (stat as jest.MockedFunction<typeof stat>).mockRejectedValueOnce(new Error('ENOENT'));
+
+    registerReadTools(registrar, createLifecycle({ fileClient: null }), { initializeManager });
+
+    await expect(getHandler(registrar, 'lsp_init')({ root: '/missing/project' })).resolves.toEqual({
+      content: [{ type: 'text', text: 'Project root does not exist: /missing/project' }],
+      error: true,
+      raw: null
+    });
+    expect(initializeManager).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing, relative, and non-directory lsp_init roots', async () => {
+    const registrar = new FakeRegistrar();
+    const initializeManager = jest.fn();
+
+    registerReadTools(registrar, createLifecycle({ fileClient: null }), { initializeManager });
+
+    await expect(getHandler(registrar, 'lsp_init')({})).resolves.toEqual({
+      content: [{ type: 'text', text: 'Project root is required. Provide lsp_init({ root: \'/absolute/path\' }).' }],
+      error: true,
+      raw: null
+    });
+    await expect(getHandler(registrar, 'lsp_init')({ root: 'relative/path' })).resolves.toEqual({
+      content: [{ type: 'text', text: 'Project root must be an absolute path: relative/path' }],
+      error: true,
+      raw: null
+    });
+
+    (stat as jest.MockedFunction<typeof stat>).mockResolvedValueOnce({ isDirectory: () => false } as Awaited<ReturnType<typeof stat>>);
+    await expect(getHandler(registrar, 'lsp_init')({ root: '/workspace/file.ts' })).resolves.toEqual({
+      content: [{ type: 'text', text: 'Project root is not a directory: /workspace/file.ts' }],
+      error: true,
+      raw: null
+    });
+    expect(initializeManager).not.toHaveBeenCalled();
+  });
+
+  it('maps lsp_init startup failures into tool errors', async () => {
+    const registrar = new FakeRegistrar();
+    const initializeManager = jest.fn().mockRejectedValue(new Error('Lifecycle start timed out'));
+
+    registerReadTools(registrar, createLifecycle({ fileClient: null }), { initializeManager });
+
+    await expect(getHandler(registrar, 'lsp_init')({ root: '/workspace' })).resolves.toEqual({
+      content: [{ type: 'text', text: 'Operation timed out after 30s — try a more specific query or check the LSP server health' }],
+      error: true,
+      raw: null
+    });
   });
 
   it('sends didOpen once and returns formatted hover results', async () => {
@@ -35,7 +118,7 @@ describe('registerReadTools', () => {
     const client = createClient({ contents: 'hover docs' });
     const lifecycle = createLifecycle({ fileClient: client });
 
-    registerReadTools(registrar, lifecycle);
+    registerReadTools(registrar, lifecycle, { initializeManager: jest.fn() });
 
     const hover = await getHandler(registrar, 'lsp_hover')({ file: '/workspace/src/index.ts', line: 2, character: 4 });
     await getHandler(registrar, 'lsp_hover')({ file: '/workspace/src/index.ts', line: 2, character: 4 });
@@ -65,7 +148,7 @@ describe('registerReadTools', () => {
       ])
     });
 
-    registerReadTools(registrar, lifecycle);
+    registerReadTools(registrar, lifecycle, { initializeManager: jest.fn() });
 
     await expect(getHandler(registrar, 'lsp_definition')({ file: '/workspace/src/index.ts', line: 1, character: 1 })).resolves.toEqual({
       content: [{ type: 'text', text: 'Found 1 definition: `/workspace/src/defs.ts:4:2`' }],
@@ -81,7 +164,7 @@ describe('registerReadTools', () => {
   it('uses the declaration flag when requesting references', async () => {
     const registrar = new FakeRegistrar();
     const client = createClient([]);
-    registerReadTools(registrar, createLifecycle({ fileClient: client }));
+    registerReadTools(registrar, createLifecycle({ fileClient: client }), { initializeManager: jest.fn() });
 
     await getHandler(registrar, 'lsp_references')({ file: '/workspace/src/index.ts', line: 0, character: 0, includeDeclaration: true });
 
@@ -97,7 +180,7 @@ describe('registerReadTools', () => {
     const firstClient = createClient([{ name: 'UserService', kind: 5, location: { uri: 'file:///workspace/src/user.ts', range: { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } } } }]);
     const secondClient = createClient([{ name: 'login', kind: 12, location: { uri: 'file:///workspace/src/auth.ts', range: { start: { line: 1, character: 0 }, end: { line: 1, character: 3 } } } }]);
 
-    registerReadTools(registrar, createLifecycle({ workspaceClients: [firstClient, secondClient] }));
+    registerReadTools(registrar, createLifecycle({ workspaceClients: [firstClient, secondClient] }), { initializeManager: jest.fn() });
 
     const result = await getHandler(registrar, 'lsp_workspace_symbols')({ query: 'log' });
 
@@ -115,7 +198,7 @@ describe('registerReadTools', () => {
   it('returns cached file diagnostics and aggregates workspace diagnostics', async () => {
     const registrar = new FakeRegistrar();
     const diagnostics = [{ uri: 'file:///workspace/src/index.ts', message: 'Boom', severity: DiagnosticSeverity.Error, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } } }];
-    registerReadTools(registrar, createLifecycle({ diagnostics, workspaceClients: [createClient([])] }));
+    registerReadTools(registrar, createLifecycle({ diagnostics, workspaceClients: [createClient([])] }), { initializeManager: jest.fn() });
 
     await expect(getHandler(registrar, 'lsp_diagnostics')({ file: '/workspace/src/index.ts' })).resolves.toEqual({
       content: [{ type: 'text', text: expect.stringContaining('File diagnostics: 1 issue(s)') }],
@@ -130,7 +213,7 @@ describe('registerReadTools', () => {
   it('returns health instantly without LSP requests', async () => {
     const registrar = new FakeRegistrar();
     const lifecycle = createLifecycle({ health: [{ language: 'typescript', status: 'ready' }] });
-    registerReadTools(registrar, lifecycle);
+    registerReadTools(registrar, lifecycle, { initializeManager: jest.fn() });
 
     await expect(getHandler(registrar, 'lsp_health')({})).resolves.toEqual({
       content: [{ type: 'text', text: '| Language | Status | Error |\n| --- | --- | --- |\n| typescript | ready |  |' }],
@@ -141,7 +224,7 @@ describe('registerReadTools', () => {
   it('supports document symbols, completion lists, and signature help fallbacks', async () => {
     const registrar = new FakeRegistrar();
     const client = createClient({ items: [{ label: 'x', kind: 3 }] });
-    registerReadTools(registrar, createLifecycle({ fileClient: client }));
+    registerReadTools(registrar, createLifecycle({ fileClient: client }), { initializeManager: jest.fn() });
 
     await expect(getHandler(registrar, 'lsp_completion')({ file: '/workspace/src/index.ts', line: 0, character: 0 })).resolves.toEqual({
       content: [{ type: 'text', text: 'Showing 1 of 1 completion item(s)\n\n### Functions\n- `x`' }],
@@ -167,7 +250,7 @@ describe('registerReadTools', () => {
       uri: 'file:///workspace/src/types.ts',
       range: { start: { line: 1, character: 2 }, end: { line: 1, character: 6 } }
     });
-    registerReadTools(registrar, createLifecycle({ fileClient: client }));
+    registerReadTools(registrar, createLifecycle({ fileClient: client }), { initializeManager: jest.fn() });
 
     await expect(getHandler(registrar, 'lsp_type_definition')({ file: '/workspace/src/index.ts', line: 0, character: 0 })).resolves.toEqual({
       content: [{ type: 'text', text: 'Found 1 definition: `/workspace/src/types.ts:2:3`' }],
@@ -196,7 +279,7 @@ describe('registerReadTools', () => {
   it('turns LSP timeouts into retry guidance', async () => {
     const registrar = new FakeRegistrar();
     const client = createClient(new Error('LSP request timed out: textDocument/hover'));
-    registerReadTools(registrar, createLifecycle({ fileClient: client }));
+    registerReadTools(registrar, createLifecycle({ fileClient: client }), { initializeManager: jest.fn() });
 
     await expect(getHandler(registrar, 'lsp_hover')({ file: '/workspace/src/index.ts', line: 0, character: 0 })).resolves.toEqual({
       content: [{ type: 'text', text: 'Operation timed out after 5s — try a more specific query or check the LSP server health' }],
@@ -207,7 +290,7 @@ describe('registerReadTools', () => {
 
   it('returns a no-server error when no language server matches the file', async () => {
     const registrar = new FakeRegistrar();
-    registerReadTools(registrar, createLifecycle({ fileClient: null }));
+    registerReadTools(registrar, createLifecycle({ fileClient: null }), { initializeManager: jest.fn() });
 
     await expect(getHandler(registrar, 'lsp_hover')({ file: '/workspace/README.md', line: 0, character: 0 })).resolves.toEqual({
       content: [{ type: 'text', text: 'No language server available for .md files. Run lsp_health for details.' }],
@@ -219,7 +302,7 @@ describe('registerReadTools', () => {
   it('returns restart guidance when the LSP crashed', async () => {
     const registrar = new FakeRegistrar();
     const client = createClient(new Error('LSP server exited unexpectedly (code: 1, signal: null)'));
-    registerReadTools(registrar, createLifecycle({ fileClient: client }));
+    registerReadTools(registrar, createLifecycle({ fileClient: client }), { initializeManager: jest.fn() });
 
     await expect(getHandler(registrar, 'lsp_hover')({ file: '/workspace/src/index.ts', line: 0, character: 0 })).resolves.toEqual({
       content: [{ type: 'text', text: 'Der Language Server ist neu gestartet, bitte versuche es erneut.' }],

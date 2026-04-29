@@ -1,4 +1,7 @@
-import type { CompletionItem, CompletionList, Hover, Location, SymbolInformation } from 'vscode-languageserver-protocol';
+import { stat } from 'node:fs/promises';
+import path from 'node:path';
+
+import type { CompletionItem, CompletionList, Location, SymbolInformation } from 'vscode-languageserver-protocol';
 import { z } from 'zod';
 
 import {
@@ -14,16 +17,28 @@ import { pathToUri } from '../../utils/uri';
 
 import {
   ensureDidOpen,
+  failure,
   mapToolError,
   noServerResult,
   normalizeLocations,
   normalizeSymbols,
   success,
+  type McpToolResult,
   type MinimalLifecycleManager,
   type ToolRegistrar
 } from './shared';
 
-export function registerReadTools(registrar: ToolRegistrar, lifecycleManager: MinimalLifecycleManager): void {
+import type { LanguageServerHealth } from '../../lsp/lifecycle-manager';
+
+interface ReadToolOptions {
+  initializeManager(root: string): Promise<{ root: string; health: LanguageServerHealth[] }>;
+}
+
+export function registerReadTools(registrar: ToolRegistrar, lifecycleManager: MinimalLifecycleManager, options: ReadToolOptions): void {
+  registrar.registerTool('lsp_init', { description: 'Initialize LSP for a project root', inputSchema: z.object({ root: z.string() }) }, async (args) => {
+    return await handleInitTool(args, options);
+  });
+
   registrar.registerTool('lsp_hover', { description: 'Show hover information', inputSchema: positionSchema }, async (args) => {
     return await runFileRequest({ args, lifecycleManager, method: 'textDocument/hover', timeoutMs: 5000, format: formatHover, raw: (result) => result });
   });
@@ -128,6 +143,45 @@ export function registerReadTools(registrar: ToolRegistrar, lifecycleManager: Mi
   });
 }
 
+async function handleInitTool(args: Record<string, unknown>, options: ReadToolOptions): Promise<McpToolResult> {
+  const root = typeof args.root === 'string' ? args.root : '';
+  if (root.length === 0) {
+    return failure('Project root is required. Provide lsp_init({ root: \'/absolute/path\' }).');
+  }
+
+  if (!path.isAbsolute(root)) {
+    return failure(`Project root must be an absolute path: ${root}`);
+  }
+
+  try {
+    const stats = await stat(root);
+    if (!stats.isDirectory()) {
+      return failure(`Project root is not a directory: ${root}`);
+    }
+  } catch {
+    return failure(`Project root does not exist: ${root}`);
+  }
+
+  try {
+    const initialized = await options.initializeManager(root);
+    const languages = initialized.health.map((entry) => formatLanguageName(entry.language));
+    const started = initialized.health.filter((entry) => entry.status === 'ready').length;
+    const errors = initialized.health.filter((entry) => entry.status === 'error').length;
+    const text = `Initialized LSP for ${initialized.root}. Detected languages: ${formatLanguageList(languages)}. LSP servers: ${started} started, ${errors} errors.`;
+    return {
+      content: [{ type: 'text', text }],
+      text,
+      raw: {
+        root: initialized.root,
+        languages,
+        health: initialized.health
+      }
+    };
+  } catch (error) {
+    return mapToolError(error, 30);
+  }
+}
+
 const positionSchema = z.object({
   file: z.string(),
   line: z.number().int(),
@@ -189,4 +243,16 @@ function stringifyResult(result: unknown): string {
   }
 
   return JSON.stringify(result, null, 2);
+}
+
+function formatLanguageList(languages: string[]): string {
+  return languages.length === 0 ? 'None' : languages.join(', ');
+}
+
+function formatLanguageName(language: string): string {
+  if (language.length === 0) {
+    return language;
+  }
+
+  return `${language[0]?.toUpperCase() ?? ''}${language.slice(1)}`;
 }

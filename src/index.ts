@@ -3,7 +3,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { LifecycleManager } from './lsp/lifecycle-manager';
 import { McpServer } from './mcp/server';
 
 interface MainOverrides {
@@ -30,23 +29,21 @@ export async function main(argv = process.argv.slice(2), env = process.env, over
   }
 
   const projectRoot = env.LSP_MCP_ROOT;
-  if (!projectRoot) {
-    stderr('LSP_MCP_ROOT is required\n');
-    exit(1);
-    return;
+  const logLevel = env.LSP_MCP_LOG_LEVEL ?? 'info';
+  const mcpServer = new McpServer(logLevel);
+
+  if (projectRoot) {
+    const initialized = await mcpServer.initializeManager(projectRoot);
+    const startupReport = summarizeHealth(initialized.health);
+    stderr(`${JSON.stringify(startupReport)}\n`);
+  } else {
+    stderr(`${JSON.stringify({ event: 'startup', status: 'waiting-for-init' })}\n`);
   }
 
-  const lifecycleManager = new LifecycleManager(projectRoot, env.LSP_MCP_LOG_LEVEL ?? 'info');
-  await lifecycleManager.start();
-
-  const startupReport = summarizeHealth(lifecycleManager.getHealth());
-  stderr(`${JSON.stringify(startupReport)}\n`);
-
-  const mcpServer = new McpServer(lifecycleManager);
   await mcpServer.start();
 
   const shutdown = async () => {
-    await lifecycleManager.shutdown();
+    await mcpServer.shutdown();
     exit(0);
   };
 

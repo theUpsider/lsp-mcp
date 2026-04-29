@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { Diagnostic, DocumentSymbol, Location, SymbolInformation } from 'vscode-languageserver-protocol';
-import type { ZodTypeAny } from 'zod';
+import type { ZodType } from 'zod';
 
 import type { LanguageServerHealth } from '../../lsp/lifecycle-manager';
 
@@ -11,7 +11,7 @@ import { pathToUri, uriToPath } from '../../utils/uri';
 export interface ToolRegistrar {
   registerTool(
     name: string,
-    config: { description?: string; inputSchema?: ZodTypeAny },
+    config: { description?: string; inputSchema?: ZodType },
     handler: (args: Record<string, unknown>) => Promise<McpToolResult>
   ): void;
 }
@@ -34,6 +34,7 @@ export interface McpToolResult {
   [key: string]: unknown;
   content: Array<{ type: 'text'; text: string }>;
   raw: unknown;
+  text?: string;
   error?: true;
 }
 
@@ -72,6 +73,11 @@ export function clearOpenedFiles(): void {
 
 export function noServerResult(filePath: string): McpToolResult {
   return failure(`No language server available for ${path.extname(filePath) || 'unknown'} files. Run lsp_health for details.`);
+}
+
+export function noProjectRootResult(): McpToolResult {
+  const text = "No project root set. Call lsp_init({ root: '/path/to/project' }) first.";
+  return { content: [{ type: 'text', text }], text, error: true, raw: null };
 }
 
 export function mapToolError(error: unknown, timeoutSeconds: number): McpToolResult {
