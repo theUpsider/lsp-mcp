@@ -135,7 +135,9 @@ async function waitForMeaningfulResult(
 
 async function invokeTool(toolName: SmokeTool, client: LspClient, language: string, file: string, line: number, character: number): Promise<SmokeResult> {
   const registrar = new IntegrationRegistrar();
-  registerReadTools(registrar, createLifecycleManager(client, language));
+  registerReadTools(registrar, createLifecycleManager(client, language), {
+    initializeManager: async () => ({ root: path.dirname(file), health: [] })
+  });
 
   const handler = registrar.tools.get(toolName);
   if (!handler) {
@@ -161,7 +163,10 @@ function createLifecycleManager(client: LspClient, language: string): MinimalLif
     getReadyClients: () => [client],
     getFileDiagnostics: () => [],
     getWorkspaceDiagnostics: () => [],
-    getHealth: () => health
+    getHealth: () => health,
+    ensureLanguageForFile: async () => undefined,
+    ensureSeedFilesOpen: async () => undefined,
+    analyzeWorkspace: async () => undefined
   };
 }
 

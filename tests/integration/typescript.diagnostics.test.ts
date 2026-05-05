@@ -106,6 +106,6 @@ describeIfAvailable('lsp_diagnostics (TypeScript)', () => {
     const result = await handler({ file: filePath, scope: 'file' });
     const text = result.content[0]?.text ?? '';
 
-    expect(text).toBe('No result');
+    expect(text).toBe('No diagnostics found');
   }, 30000);
 });
