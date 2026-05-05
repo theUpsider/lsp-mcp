@@ -253,6 +253,28 @@ export class LspClient extends EventEmitter {
     }
   }
 
+  public async openAllFilesForDiagnostics(extensions: string[]): Promise<void> {
+    const MAX_FILES = 100;
+    const allFiles = await findAllFilesWithExtension(
+      this.projectRoot,
+      extensions,
+      MAX_FILES,
+    );
+    const newFiles = allFiles.filter((f) => !this.openedFiles.has(f));
+
+    if (newFiles.length === 0) {
+      return;
+    }
+
+    // Set up wait promises BEFORE opening files to avoid missing notifications
+    const waitPromises = newFiles.map((f) =>
+      this.waitForDiagnosticsPublish(f, 15000),
+    );
+
+    await Promise.all(newFiles.map((f) => this.ensureDidOpen(f)));
+    await Promise.all(waitPromises);
+  }
+
   private sendMessage(message: JsonRpcMessage): void {
     if (!this.process) {
       throw new Error("LSP process is not running");
@@ -461,4 +483,46 @@ async function findFirstFileWithExtension(
   }
 
   return null;
+}
+
+async function findAllFilesWithExtension(
+  dir: string,
+  extensions: string[],
+  maxFiles: number,
+  results: string[] = [],
+): Promise<string[]> {
+  if (results.length >= maxFiles) return results;
+
+  const extensionSet = new Set(extensions.map((e) => e.toLowerCase()));
+
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return results;
+  }
+
+  for (const entry of entries) {
+    if (results.length >= maxFiles) break;
+    if (
+      entry.isFile() &&
+      extensionSet.has(path.extname(entry.name).toLowerCase())
+    ) {
+      results.push(path.join(dir, entry.name));
+    }
+  }
+
+  for (const entry of entries) {
+    if (results.length >= maxFiles) break;
+    if (entry.isDirectory() && !SKIP_DIRS.has(entry.name)) {
+      await findAllFilesWithExtension(
+        path.join(dir, entry.name),
+        extensions,
+        maxFiles,
+        results,
+      );
+    }
+  }
+
+  return results;
 }

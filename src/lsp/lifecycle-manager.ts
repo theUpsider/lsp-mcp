@@ -1,24 +1,30 @@
-import path from 'node:path';
+import path from "node:path";
 
-import type { Diagnostic, ServerCapabilities } from 'vscode-languageserver-protocol';
+import type {
+  Diagnostic,
+  ServerCapabilities,
+} from "vscode-languageserver-protocol";
 
-import { detectLanguages } from '../detection/language-detector';
-import { extensionToLanguage, extensionsForLanguage } from '../detection/language-registry';
+import { detectLanguages } from "../detection/language-detector";
+import {
+  extensionToLanguage,
+  extensionsForLanguage,
+} from "../detection/language-registry";
 
-import { DiagnosticStore } from './diagnostic-store';
-import { LspClient } from './lsp-client';
-import { ServerSupervisor } from './server-supervisor';
+import { DiagnosticStore } from "./diagnostic-store";
+import { LspClient } from "./lsp-client";
+import { ServerSupervisor } from "./server-supervisor";
 
 export interface LanguageServerHealth {
   language: string;
-  status: 'ready' | 'error' | 'starting';
+  status: "ready" | "error" | "starting";
   error?: string;
   capabilities?: ServerCapabilities;
 }
 
 export class LifecycleManager {
   private readonly projectRoot: string;
-  private readonly logLevel: 'error' | 'info' | 'debug';
+  private readonly logLevel: "error" | "info" | "debug";
   private readonly supervisors = new Map<string, ServerSupervisor>();
   private readonly store = new DiagnosticStore();
 
@@ -29,7 +35,7 @@ export class LifecycleManager {
 
   public async start(languages?: string[]): Promise<void> {
     const startPromise = this.startInternal(languages);
-    await promiseWithTimeout(startPromise, 30000, 'Lifecycle start timed out');
+    await promiseWithTimeout(startPromise, 30000, "Lifecycle start timed out");
   }
 
   public async ensureLanguage(language: string): Promise<void> {
@@ -63,14 +69,19 @@ export class LifecycleManager {
   }
 
   public getHealth(): LanguageServerHealth[] {
-    return Array.from(this.supervisors.values()).map((supervisor) => supervisor.getHealth());
+    return Array.from(this.supervisors.values()).map((supervisor) =>
+      supervisor.getHealth(),
+    );
   }
 
   public getReadyClients(language?: string): LspClient[] {
     return Array.from(this.supervisors.values())
       .filter((supervisor) => {
         const health = supervisor.getHealth();
-        return health.status === 'ready' && (!language || supervisor.language === language);
+        return (
+          health.status === "ready" &&
+          (!language || supervisor.language === language)
+        );
       })
       .flatMap((supervisor) => {
         const client = supervisor.getClient();
@@ -78,33 +89,66 @@ export class LifecycleManager {
       });
   }
 
-  public getFileDiagnostics(filePath: string): Array<Diagnostic & { uri: string }> {
+  public getFileDiagnostics(
+    filePath: string,
+  ): Array<Diagnostic & { uri: string }> {
     return this.store.getForFile(filePath);
   }
 
-  public getWorkspaceDiagnostics(language?: string): Array<Diagnostic & { uri: string }> {
+  public getWorkspaceDiagnostics(
+    language?: string,
+  ): Array<Diagnostic & { uri: string }> {
     return this.store.getForWorkspace(language);
+  }
+
+  public async analyzeWorkspace(language?: string): Promise<void> {
+    await Promise.all(
+      Array.from(this.supervisors.entries())
+        .filter(([lang, supervisor]) => {
+          const health = supervisor.getHealth();
+          return health.status === "ready" && (!language || lang === language);
+        })
+        .map(async ([lang, supervisor]) => {
+          const client = supervisor.getClient();
+          if (!client) return;
+          const extensions = extensionsForLanguage(lang);
+          await client.openAllFilesForDiagnostics(extensions);
+        }),
+    );
   }
 
   public async ensureSeedFilesOpen(): Promise<void> {
     await Promise.all(
-      Array.from(this.supervisors.entries()).map(async ([language, supervisor]) => {
-        const client = supervisor.getClient();
-        if (!client) return;
-        const extensions = extensionsForLanguage(language);
-        await client.ensureSeedFileOpen(extensions);
-      })
+      Array.from(this.supervisors.entries()).map(
+        async ([language, supervisor]) => {
+          const client = supervisor.getClient();
+          if (!client) return;
+          const extensions = extensionsForLanguage(language);
+          await client.ensureSeedFileOpen(extensions);
+        },
+      ),
     );
   }
 
   public async shutdown(): Promise<void> {
     const supervisors = Array.from(this.supervisors.values());
     const results = await Promise.allSettled(
-      supervisors.map(async (supervisor) => await promiseWithTimeout(supervisor.shutdown(), 5000, 'LSP shutdown timed out'))
+      supervisors.map(
+        async (supervisor) =>
+          await promiseWithTimeout(
+            supervisor.shutdown(),
+            5000,
+            "LSP shutdown timed out",
+          ),
+      ),
     );
-    const errors = results.filter((result) => result.status === 'rejected').length;
+    const errors = results.filter(
+      (result) => result.status === "rejected",
+    ).length;
 
-    process.stderr.write(`{"timestamp":"${new Date().toISOString()}","level":"info","event":"Shutdown: ${supervisors.length - errors} LSP-Server beendet, ${errors} Fehler"}\n`);
+    process.stderr.write(
+      `{"timestamp":"${new Date().toISOString()}","level":"info","event":"Shutdown: ${supervisors.length - errors} LSP-Server beendet, ${errors} Fehler"}\n`,
+    );
   }
 
   private async startInternal(languages?: string[]): Promise<void> {
@@ -120,23 +164,32 @@ export class LifecycleManager {
   }
 
   private createSupervisor(language: string): ServerSupervisor {
-    return new ServerSupervisor(language, this.projectRoot, this.logLevel, (method, params) => {
-      if (method === 'textDocument/publishDiagnostics') {
-        this.store.store(params);
-      }
-    });
+    return new ServerSupervisor(
+      language,
+      this.projectRoot,
+      this.logLevel,
+      (method, params) => {
+        if (method === "textDocument/publishDiagnostics") {
+          this.store.store(params);
+        }
+      },
+    );
   }
 }
 
-function normalizeLogLevel(level: string): 'error' | 'info' | 'debug' {
-  if (level === 'error' || level === 'debug') {
+function normalizeLogLevel(level: string): "error" | "info" | "debug" {
+  if (level === "error" || level === "debug") {
     return level;
   }
 
-  return 'info';
+  return "info";
 }
 
-async function promiseWithTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+async function promiseWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
     promise.then(
@@ -147,7 +200,7 @@ async function promiseWithTimeout<T>(promise: Promise<T>, timeoutMs: number, mes
       (error: unknown) => {
         clearTimeout(timer);
         reject(error);
-      }
+      },
     );
   });
 }
