@@ -207,7 +207,10 @@ export class LspClient extends EventEmitter {
   ): Promise<void> {
     const uri = pathToUri(filePath);
     return new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, timeoutMs);
+      const timer = setTimeout(() => {
+        this.off("notification", handler);
+        resolve();
+      }, timeoutMs);
       const handler = (method: string, params: unknown): void => {
         if (method === "textDocument/publishDiagnostics") {
           const p = params as { uri?: string };
@@ -412,11 +415,23 @@ function shouldLog(configuredLevel: LogLevel, messageLevel: LogLevel): boolean {
 }
 
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', 'out', '.next',
-  'coverage', '__pycache__', 'target', '.cache', 'vendor',
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  "out",
+  ".next",
+  "coverage",
+  "__pycache__",
+  "target",
+  ".cache",
+  "vendor",
 ]);
 
-async function findFirstFileWithExtension(dir: string, extensions: string[]): Promise<string | null> {
+async function findFirstFileWithExtension(
+  dir: string,
+  extensions: string[],
+): Promise<string | null> {
   const extensionSet = new Set(extensions.map((e) => e.toLowerCase()));
 
   let entries;
@@ -427,14 +442,20 @@ async function findFirstFileWithExtension(dir: string, extensions: string[]): Pr
   }
 
   for (const entry of entries) {
-    if (entry.isFile() && extensionSet.has(path.extname(entry.name).toLowerCase())) {
+    if (
+      entry.isFile() &&
+      extensionSet.has(path.extname(entry.name).toLowerCase())
+    ) {
       return path.join(dir, entry.name);
     }
   }
 
   for (const entry of entries) {
     if (entry.isDirectory() && !SKIP_DIRS.has(entry.name)) {
-      const result = await findFirstFileWithExtension(path.join(dir, entry.name), extensions);
+      const result = await findFirstFileWithExtension(
+        path.join(dir, entry.name),
+        extensions,
+      );
       if (result) return result;
     }
   }

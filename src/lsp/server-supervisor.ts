@@ -1,11 +1,15 @@
-import type { ServerCapabilities } from 'vscode-languageserver-protocol';
+import type { ServerCapabilities } from "vscode-languageserver-protocol";
 
-import { findAvailableLsp, getLspCandidates, type LspCandidate } from '../detection/lsp-mapping';
+import {
+  findAvailableLsp,
+  getLspCandidates,
+  type LspCandidate,
+} from "../detection/lsp-mapping";
 
-import { installLsp } from './installer';
-import { LspClient } from './lsp-client';
+import { installLsp } from "./installer";
+import { LspClient } from "./lsp-client";
 
-export type SupervisorStatus = 'ready' | 'error' | 'starting';
+export type SupervisorStatus = "ready" | "error" | "starting";
 
 export interface ServerSupervisorHealth {
   language: string;
@@ -14,17 +18,16 @@ export interface ServerSupervisorHealth {
   capabilities?: ServerCapabilities;
 }
 
-type LogLevel = 'error' | 'info' | 'debug';
+type LogLevel = "error" | "info" | "debug";
 
 export class ServerSupervisor {
   public readonly language: string;
   public restartCount = 0;
 
   private client: LspClient | null = null;
-  private status: SupervisorStatus = 'starting';
+  private status: SupervisorStatus = "starting";
   private error: string | undefined = undefined;
   private capabilities: ServerCapabilities | undefined = undefined;
-  private serverDef: LspCandidate | null = null;
   private healthInterval: NodeJS.Timeout | null = null;
 
   private readonly projectRoot: string;
@@ -36,7 +39,7 @@ export class ServerSupervisor {
     language: string,
     projectRoot: string,
     logLevel: LogLevel,
-    onDiagnostics: (method: string, params: unknown) => void
+    onDiagnostics: (method: string, params: unknown) => void,
   ) {
     this.language = language;
     this.projectRoot = projectRoot;
@@ -47,39 +50,39 @@ export class ServerSupervisor {
   public async start(): Promise<void> {
     const serverDef = await this.resolveServer();
     if (!serverDef) {
-      this.status = 'error';
+      this.status = "error";
       this.error = `No LSP server available for ${this.language}`;
       return;
     }
 
-    this.serverDef = serverDef;
     const client = new LspClient(serverDef, this.projectRoot, this.logLevel);
     this.client = client;
 
-    client.on('crash', async () => {
+    client.on("crash", async () => {
       if (this.shuttingDown) {
         return;
       }
 
       await this.restart(`LSP server crashed for ${this.language}`);
     });
-    client.on('error', (error: unknown) => {
-      this.status = 'error';
-      this.error = error instanceof Error ? error.message : 'Unknown LSP error';
+    client.on("error", (error: unknown) => {
+      this.status = "error";
+      this.error = error instanceof Error ? error.message : "Unknown LSP error";
     });
-    client.on('notification', (method: string, params: unknown) => {
+    client.on("notification", (method: string, params: unknown) => {
       this.onDiagnostics(method, params);
     });
 
     try {
       await client.start();
-      this.status = 'ready';
+      this.status = "ready";
       this.error = undefined;
       this.capabilities = client.getCapabilities() ?? undefined;
       this.startHealthChecks();
     } catch (error) {
-      this.status = 'error';
-      this.error = error instanceof Error ? error.message : 'Unknown LSP startup error';
+      this.status = "error";
+      this.error =
+        error instanceof Error ? error.message : "Unknown LSP startup error";
     }
   }
 
@@ -90,19 +93,23 @@ export class ServerSupervisor {
     }
 
     if (this.restartCount >= 3) {
-      this.status = 'error';
+      this.status = "error";
       this.error = reason;
       this.client = null;
       return;
     }
 
     this.restartCount += 1;
-    this.status = 'starting';
+    this.status = "starting";
     this.error = reason;
 
     if (this.client) {
       try {
-        await promiseWithTimeout(this.client.shutdown(), 5000, 'LSP shutdown timed out');
+        await promiseWithTimeout(
+          this.client.shutdown(),
+          5000,
+          "LSP shutdown timed out",
+        );
       } catch {
         // Ignore shutdown failures during restart.
       }
@@ -134,7 +141,7 @@ export class ServerSupervisor {
       language: this.language,
       status: this.status,
       error: this.error,
-      capabilities: this.capabilities
+      capabilities: this.capabilities,
     };
   }
 
@@ -149,12 +156,12 @@ export class ServerSupervisor {
   }
 
   private async runHealthCheck(): Promise<void> {
-    if (!this.client || this.status !== 'ready') {
+    if (!this.client || this.status !== "ready") {
       return;
     }
 
     if (!this.client.isReady()) {
-      await this.restart('LSP client lost ready state');
+      await this.restart("LSP client lost ready state");
     }
   }
 
@@ -178,7 +185,11 @@ export class ServerSupervisor {
   }
 }
 
-async function promiseWithTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+async function promiseWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
     promise.then(
@@ -189,7 +200,7 @@ async function promiseWithTimeout<T>(promise: Promise<T>, timeoutMs: number, mes
       (error: unknown) => {
         clearTimeout(timer);
         reject(error);
-      }
+      },
     );
   });
 }
