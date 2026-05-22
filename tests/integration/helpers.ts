@@ -26,7 +26,7 @@ interface SmokeRequest {
   character: number;
 }
 
-type SmokeTool = 'lsp_hover' | 'lsp_definition';
+type SmokeTool = 'lsp_definition';
 
 class IntegrationRegistrar implements ToolRegistrar {
   public readonly tools = new Map<string, (args: Record<string, unknown>) => Promise<McpToolResult>>();
@@ -81,10 +81,6 @@ export async function cleanup(dir: string): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   }
-}
-
-export async function runHoverSmokeTest(request: SmokeRequest): Promise<SmokeResult> {
-  return await runToolSmokeTest('lsp_hover', request);
 }
 
 export async function runDefinitionSmokeTest(request: SmokeRequest): Promise<SmokeResult> {
@@ -214,7 +210,7 @@ function fixtureFor(language: string, dir: string): {
         entryFile: 'test.py',
         files: [
           { relativePath: 'pyproject.toml', content: '[project]\nname = "smoke"\nversion = "0.0.0"\n' },
-          { relativePath: 'test.py', content: 'x = 1\n' }
+          { relativePath: 'test.py', content: 'x = 1\nprint(x)\n' }
         ]
       };
     case 'typescript':
@@ -223,7 +219,7 @@ function fixtureFor(language: string, dir: string): {
         files: [
           { relativePath: 'package.json', content: '{"name":"smoke-ts","private":true}\n' },
           { relativePath: 'tsconfig.json', content: '{"compilerOptions":{"target":"ES2022"}}\n' },
-          { relativePath: 'test.ts', content: 'const x = 1;\n' }
+          { relativePath: 'test.ts', content: 'const x = 1;\nconsole.log(x);\n' }
         ]
       };
     case 'javascript':
@@ -231,7 +227,7 @@ function fixtureFor(language: string, dir: string): {
         entryFile: 'test.js',
         files: [
           { relativePath: 'package.json', content: '{"name":"smoke-js","private":true}\n' },
-          { relativePath: 'test.js', content: 'const x = 1;\n' }
+          { relativePath: 'test.js', content: 'const x = 1;\nconsole.log(x);\n' }
         ]
       };
     case 'go':
@@ -280,7 +276,7 @@ function fixtureFor(language: string, dir: string): {
         entryFile: 'test.rb',
         files: [
           { relativePath: 'Gemfile', content: 'source "https://rubygems.org"\n' },
-          { relativePath: 'test.rb', content: 'x = 1\nx\n' }
+          { relativePath: 'test.rb', content: 'x = 1\nputs x\n' }
         ]
       };
     case 'php':
@@ -288,7 +284,7 @@ function fixtureFor(language: string, dir: string): {
         entryFile: 'test.php',
         files: [
           { relativePath: 'composer.json', content: '{"name":"smoke/php"}\n' },
-          { relativePath: 'test.php', content: '<?php\n$x = 1;\n' }
+          { relativePath: 'test.php', content: '<?php\n$x = 1;\necho $x;\n' }
         ]
       };
     case 'kotlin':
@@ -310,12 +306,12 @@ function fixtureFor(language: string, dir: string): {
     case 'c':
       return {
         entryFile: 'test.c',
-        files: [{ relativePath: 'test.c', content: 'int main() { int x = 1; return 0; }\n' }]
+        files: [{ relativePath: 'test.c', content: 'int main() {\n  int x = 1;\n  return x;\n}\n' }]
       };
     case 'cpp':
       return {
         entryFile: 'test.cpp',
-        files: [{ relativePath: 'test.cpp', content: 'int main() { int x = 1; return 0; }\n' }]
+        files: [{ relativePath: 'test.cpp', content: 'int main() {\n  int x = 1;\n  return x;\n}\n' }]
       };
     default:
       throw new Error(`Unsupported smoke test language: ${language} in ${dir}`);

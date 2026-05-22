@@ -168,20 +168,26 @@ describe("registerReadTools", () => {
     });
   });
 
-  it("sends didOpen once and returns formatted hover results", async () => {
+  it("sends didOpen and returns formatted definition results", async () => {
     const registrar = new FakeRegistrar();
-    const client = createClient({ contents: "hover docs" });
+    const client = createClient({
+      uri: "file:///workspace/src/defs.ts",
+      range: {
+        start: { line: 3, character: 1 },
+        end: { line: 3, character: 2 },
+      },
+    });
     const lifecycle = createLifecycle({ fileClient: client });
 
     registerReadTools(registrar, lifecycle, { initializeManager: jest.fn() });
 
-    const hover = await getHandler(
+    const definition = await getHandler(
       registrar,
-      "lsp_hover",
+      "lsp_definition",
     )({ file: "/workspace/src/index.ts", line: 2, character: 4 });
     await getHandler(
       registrar,
-      "lsp_hover",
+      "lsp_definition",
     )({ file: "/workspace/src/index.ts", line: 2, character: 4 });
 
     expect(client.ensureDidOpen).toHaveBeenCalledTimes(2);
@@ -189,16 +195,29 @@ describe("registerReadTools", () => {
       "/workspace/src/index.ts",
     );
     expect(client.request).toHaveBeenCalledWith(
-      "textDocument/hover",
+      "textDocument/definition",
       {
         textDocument: { uri: "file:///workspace/src/index.ts" },
         position: { line: 2, character: 4 },
       },
       5000,
     );
-    expect(hover).toEqual({
-      content: [{ type: "text", text: "hover docs" }],
-      raw: { contents: "hover docs" },
+    expect(definition).toEqual({
+      content: [
+        {
+          type: "text",
+          text: "Found 1 definition: `/workspace/src/defs.ts:4:2`",
+        },
+      ],
+      raw: [
+        {
+          path: "/workspace/src/defs.ts",
+          range: {
+            start: { line: 3, character: 1 },
+            end: { line: 3, character: 2 },
+          },
+        },
+      ],
     });
   });
 
@@ -409,29 +428,9 @@ describe("registerReadTools", () => {
     });
   });
 
-  it("supports document symbols, completion lists, and signature help fallbacks", async () => {
+  it("supports document symbols", async () => {
     const registrar = new FakeRegistrar();
-    const client = createClient({ items: [{ label: "x", kind: 3 }] });
-    registerReadTools(registrar, createLifecycle({ fileClient: client }), {
-      initializeManager: jest.fn(),
-    });
-
-    await expect(
-      getHandler(
-        registrar,
-        "lsp_completion",
-      )({ file: "/workspace/src/index.ts", line: 0, character: 0 }),
-    ).resolves.toEqual({
-      content: [
-        {
-          type: "text",
-          text: "Showing 1 of 1 completion item(s)\n\n### Functions\n- `x`",
-        },
-      ],
-      raw: [{ label: "x", kind: 3 }],
-    });
-
-    client.request.mockResolvedValueOnce([
+    const client = createClient([
       {
         name: "DocSymbol",
         kind: 5,
@@ -445,6 +444,10 @@ describe("registerReadTools", () => {
         },
       },
     ]);
+    registerReadTools(registrar, createLifecycle({ fileClient: client }), {
+      initializeManager: jest.fn(),
+    });
+
     await expect(
       getHandler(
         registrar,
@@ -467,20 +470,9 @@ describe("registerReadTools", () => {
         },
       ],
     });
-
-    client.request.mockResolvedValueOnce(null);
-    await expect(
-      getHandler(
-        registrar,
-        "lsp_signature_help",
-      )({ file: "/workspace/src/index.ts", line: 0, character: 0 }),
-    ).resolves.toEqual({
-      content: [{ type: "text", text: "No result" }],
-      raw: null,
-    });
   });
 
-  it("supports type and implementation lookups plus empty completion results", async () => {
+  it("supports type and implementation lookups", async () => {
     const registrar = new FakeRegistrar();
     const client = createClient({
       uri: "file:///workspace/src/types.ts",
@@ -526,45 +518,12 @@ describe("registerReadTools", () => {
       content: [{ type: "text", text: "No result" }],
       raw: null,
     });
-
-    client.request.mockResolvedValueOnce(null);
-    await expect(
-      getHandler(
-        registrar,
-        "lsp_completion",
-      )({ file: "/workspace/src/index.ts", line: 0, character: 0 }),
-    ).resolves.toEqual({
-      content: [{ type: "text", text: "No result" }],
-      raw: null,
-    });
-
-    client.request.mockResolvedValueOnce({
-      signatures: [{ label: "fn(x: string)" }],
-    });
-    await expect(
-      getHandler(
-        registrar,
-        "lsp_signature_help",
-      )({ file: "/workspace/src/index.ts", line: 0, character: 0 }),
-    ).resolves.toEqual({
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(
-            { signatures: [{ label: "fn(x: string)" }] },
-            null,
-            2,
-          ),
-        },
-      ],
-      raw: { signatures: [{ label: "fn(x: string)" }] },
-    });
   });
 
   it("turns LSP timeouts into retry guidance", async () => {
     const registrar = new FakeRegistrar();
     const client = createClient(
-      new Error("LSP request timed out: textDocument/hover"),
+      new Error("LSP request timed out: textDocument/definition"),
     );
     registerReadTools(registrar, createLifecycle({ fileClient: client }), {
       initializeManager: jest.fn(),
@@ -573,7 +532,7 @@ describe("registerReadTools", () => {
     await expect(
       getHandler(
         registrar,
-        "lsp_hover",
+        "lsp_definition",
       )({ file: "/workspace/src/index.ts", line: 0, character: 0 }),
     ).resolves.toEqual({
       content: [
@@ -596,7 +555,7 @@ describe("registerReadTools", () => {
     await expect(
       getHandler(
         registrar,
-        "lsp_hover",
+        "lsp_definition",
       )({ file: "/workspace/README.md", line: 0, character: 0 }),
     ).resolves.toEqual({
       content: [
@@ -622,7 +581,7 @@ describe("registerReadTools", () => {
     await expect(
       getHandler(
         registrar,
-        "lsp_hover",
+        "lsp_definition",
       )({ file: "/workspace/src/index.ts", line: 0, character: 0 }),
     ).resolves.toEqual({
       content: [

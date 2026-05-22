@@ -1,9 +1,9 @@
-import { hasAvailableLsp, runHoverSmokeTest } from './helpers';
+import { hasAvailableLsp, runDefinitionSmokeTest } from './helpers';
 
 const smokeTest = hasAvailableLsp('go') ? test : test.skip;
 
-smokeTest('go hover smoke test', async () => {
-  const result = await runHoverSmokeTest({ language: 'go', line: 1, character: 14 });
+smokeTest('go definition smoke test', async () => {
+  const result = await runDefinitionSmokeTest({ language: 'go', line: 2, character: 6 });
 
   expect(result).toEqual(expect.objectContaining({ text: expect.any(String), raw: expect.anything() }));
   expect(result.text).not.toBe('No result');

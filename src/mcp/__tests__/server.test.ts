@@ -56,7 +56,7 @@ describe('McpServer', () => {
 
     readTools.mockImplementationOnce((registrar: { registerTool: Function }) => {
       registrar.registerTool('lsp_init', { description: 'init' }, async () => ({ content: [{ type: 'text', text: 'ok' }], raw: null }));
-      registrar.registerTool('lsp_hover', { description: 'hover' }, async () => ({ content: [{ type: 'text', text: 'hover' }], raw: null }));
+      registrar.registerTool('lsp_definition', { description: 'definition' }, async () => ({ content: [{ type: 'text', text: 'definition' }], raw: null }));
     });
     writeTools.mockImplementationOnce(() => undefined);
 
@@ -69,7 +69,7 @@ describe('McpServer', () => {
     const result = await listHandler({});
 
     expect(result.tools.map((t: { name: string }) => t.name)).toContain('lsp_init');
-    expect(result.tools.map((t: { name: string }) => t.name)).toContain('lsp_hover');
+    expect(result.tools.map((t: { name: string }) => t.name)).toContain('lsp_definition');
   });
 
   it('lists all tools after initialization too', async () => {
@@ -78,7 +78,7 @@ describe('McpServer', () => {
 
     readTools.mockImplementationOnce((registrar: { registerTool: Function }) => {
       registrar.registerTool('lsp_init', { description: 'init' }, async () => ({ content: [{ type: 'text', text: 'ok' }], raw: null }));
-      registrar.registerTool('lsp_hover', { description: 'hover' }, async () => ({ content: [{ type: 'text', text: 'hover' }], raw: null }));
+      registrar.registerTool('lsp_definition', { description: 'definition' }, async () => ({ content: [{ type: 'text', text: 'definition' }], raw: null }));
     });
     writeTools.mockImplementationOnce(() => undefined);
 
@@ -92,7 +92,7 @@ describe('McpServer', () => {
     const result = await listHandler({});
 
     expect(result.tools.map((t: { name: string }) => t.name)).toContain('lsp_init');
-    expect(result.tools.map((t: { name: string }) => t.name)).toContain('lsp_hover');
+    expect(result.tools.map((t: { name: string }) => t.name)).toContain('lsp_definition');
   });
 
   it('returns no-root error for non-init tools before lsp_init', async () => {
@@ -100,7 +100,7 @@ describe('McpServer', () => {
     const writeTools = jest.requireMock('../tools/write-tools').registerWriteTools as jest.Mock;
 
     readTools.mockImplementationOnce((registrar: { registerTool: Function }) => {
-      registrar.registerTool('lsp_hover', { description: 'hover' }, async () => ({ content: [{ type: 'text', text: 'reachable' }], raw: null }));
+      registrar.registerTool('lsp_definition', { description: 'definition' }, async () => ({ content: [{ type: 'text', text: 'reachable' }], raw: null }));
     });
     writeTools.mockImplementationOnce(() => undefined);
 
@@ -110,7 +110,7 @@ describe('McpServer', () => {
     await server.start();
 
     const callHandler = getHandler(CallToolRequestSchema);
-    const result = await callHandler({ params: { name: 'lsp_hover', arguments: {} } });
+    const result = await callHandler({ params: { name: 'lsp_definition', arguments: {} } });
 
     expect(result.content[0].text).toMatch(/No project root set/);
   });

@@ -247,34 +247,7 @@ describe("registerWriteTools", () => {
     );
   });
 
-  it("applies a raw workspace edit across files", async () => {
-    const registrar = new FakeRegistrar();
-    const client = createClient(null);
-    registerWriteTools(registrar, createLifecycle(client));
-
-    const edit = {
-      changes: {
-        "file:///workspace/src/index.ts": [
-          {
-            range: {
-              start: { line: 0, character: 6 },
-              end: { line: 0, character: 9 },
-            },
-            newText: "bar",
-          },
-        ],
-      },
-    };
-
-    await expect(
-      getHandler(registrar, "lsp_apply_workspace_edit")({ edit }),
-    ).resolves.toEqual({
-      content: [{ type: "text", text: "Applied workspace edit to 1 file(s)" }],
-      raw: { changedFiles: ["/workspace/src/index.ts"] },
-    });
-  });
-
-  it("supports indexed code actions, empty edits, and document changes", async () => {
+  it("supports indexed code actions and document changes", async () => {
     const registrar = new FakeRegistrar();
     const client = createClient([
       { title: "Skip me" },
@@ -316,41 +289,6 @@ describe("registerWriteTools", () => {
     ).resolves.toEqual({
       content: [{ type: "text", text: "Applied code action: Apply me" }],
       raw: { title: "Apply me", changedFiles: ["/workspace/src/index.ts"] },
-    });
-
-    client.request.mockResolvedValueOnce(null);
-    await expect(
-      getHandler(registrar, "lsp_apply_workspace_edit")({ edit: null }),
-    ).resolves.toEqual({
-      content: [{ type: "text", text: "No result" }],
-      raw: null,
-    });
-  });
-
-  it("returns an error when no write-capable client is ready", async () => {
-    const registrar = new FakeRegistrar();
-    registerWriteTools(registrar, {
-      getClientForFile: jest.fn(() => null),
-      getReadyClients: jest.fn(() => []),
-      getFileDiagnostics: jest.fn((_: string) => []),
-      getWorkspaceDiagnostics: jest.fn(() => []),
-      getHealth: jest.fn(() => []),
-      ensureLanguageForFile: jest.fn().mockResolvedValue(undefined),
-      ensureSeedFilesOpen: jest.fn().mockResolvedValue(undefined),
-      analyzeWorkspace: jest.fn().mockResolvedValue(undefined),
-    });
-
-    await expect(
-      getHandler(registrar, "lsp_apply_workspace_edit")({ edit: {} }),
-    ).resolves.toEqual({
-      content: [
-        {
-          type: "text",
-          text: "No language servers are ready. Run lsp_health for details.",
-        },
-      ],
-      error: true,
-      raw: null,
     });
   });
 

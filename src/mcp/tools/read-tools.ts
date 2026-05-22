@@ -2,19 +2,15 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 
 import type {
-  CompletionItem,
-  CompletionList,
   Location,
   SymbolInformation,
 } from "vscode-languageserver-protocol";
 import { z } from "zod";
 
 import {
-  formatCompletion,
   formatDefinition,
   formatDiagnostics,
   formatHealth,
-  formatHover,
   formatReferences,
   formatSymbols,
 } from "../formatters";
@@ -58,21 +54,6 @@ export function registerReadTools(
     },
     async (args) => {
       return await handleInitTool(args, options);
-    },
-  );
-
-  registrar.registerTool(
-    "lsp_hover",
-    { description: "Show hover information", inputSchema: positionSchema },
-    async (args) => {
-      return await runFileRequest({
-        args,
-        lifecycleManager,
-        method: "textDocument/hover",
-        timeoutMs: 5000,
-        format: formatHover,
-        raw: (result) => result,
-      });
     },
   );
 
@@ -159,21 +140,6 @@ export function registerReadTools(
   );
 
   registrar.registerTool(
-    "lsp_completion",
-    { description: "Get completions", inputSchema: positionSchema },
-    async (args) => {
-      return await runFileRequest<CompletionItem[] | CompletionList | null>({
-        args,
-        lifecycleManager,
-        method: "textDocument/completion",
-        timeoutMs: 5000,
-        format: (result) => formatCompletion(asCompletionItems(result)),
-        raw: (result) => asCompletionItems(result)?.slice(0, 50) ?? null,
-      });
-    },
-  );
-
-  registrar.registerTool(
     "lsp_diagnostics",
     {
       description:
@@ -216,21 +182,6 @@ export function registerReadTools(
 
       const diagnostics = lifecycleManager.getFileDiagnostics(filePath);
       return success(formatDiagnostics(diagnostics, "file"), diagnostics);
-    },
-  );
-
-  registrar.registerTool(
-    "lsp_signature_help",
-    { description: "Show signature help", inputSchema: positionSchema },
-    async (args) => {
-      return await runFileRequest({
-        args,
-        lifecycleManager,
-        method: "textDocument/signatureHelp",
-        timeoutMs: 5000,
-        format: stringifyResult,
-        raw: (result) => result,
-      });
     },
   );
 
@@ -390,24 +341,6 @@ function asLocationArray(
   }
 
   return Array.isArray(result) ? result : [result];
-}
-
-function asCompletionItems(
-  result: CompletionItem[] | CompletionList | null,
-): CompletionItem[] | null {
-  if (!result) {
-    return null;
-  }
-
-  return Array.isArray(result) ? result : result.items;
-}
-
-function stringifyResult(result: unknown): string {
-  if (!result) {
-    return "No result";
-  }
-
-  return JSON.stringify(result, null, 2);
 }
 
 function formatLanguageList(languages: string[]): string {
