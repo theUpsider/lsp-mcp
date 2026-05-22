@@ -89,19 +89,6 @@ export function registerWriteTools(registrar: ToolRegistrar, lifecycleManager: M
     });
   });
 
-  registrar.registerTool('lsp_apply_workspace_edit', { description: 'Apply raw workspace edit', inputSchema: z.object({ edit: z.record(z.string(), z.unknown()) }) }, async (args) => {
-    const clients = lifecycleManager.getReadyClients();
-    const client = clients[0] ?? null;
-    if (!client) {
-      return failure('No language servers are ready. Run lsp_health for details.');
-    }
-
-    try {
-      return await applyWorkspaceEdit((args.edit ?? null) as WorkspaceEdit | null, lifecycleManager, client, 'Applied workspace edit to');
-    } catch (error) {
-      return mapToolError(error, 15);
-    }
-  });
 }
 
 const positionSchema = z.object({ line: z.number().int(), character: z.number().int() });

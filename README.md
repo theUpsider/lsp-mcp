@@ -32,7 +32,7 @@ A Model Context Protocol (MCP) server that gives language models access to **Lan
 
 - **🔍 Automatic Language Detection** — Scans project root for language markers (`package.json`, `Cargo.toml`, `go.mod`, etc.)
 - **🔄 Auto Language Server Selection** — Hardcoded mapping with fallback servers; installs missing LSPs automatically
-- **🛠 19 LSP Tools** — Hover, definition, references, completions, diagnostics, rename, code actions, formatting, and more
+- **🛠 12 LSP Tools** — Definition, references, symbols, diagnostics, rename, code actions, formatting, and more
 - **📝 Read & Write Operations** — Both inspection and modification of code via LSP
 - **🌐 Polyglot Support** — Multiple language servers run simultaneously in the same project
 - **📋 Hybrid Responses** — Human-readable `text` field + raw LSP data in `raw` field
@@ -103,14 +103,11 @@ lsp_init({ root: "/path/to/project", languages: ["python", "typescript"] })
 | Tool                    | Description                             | Key Parameters                                         |
 | ----------------------- | --------------------------------------- | ------------------------------------------------------ |
 | `lsp_init`              | Initialize server for a project root    | `root` (required), `languages` (optional string array) |
-| `lsp_hover`             | Show type info / documentation          | `file`, `line`, `character`                            |
 | `lsp_definition`        | Go to definition                | `file`, `line`, `character`           |
 | `lsp_references`        | Find all references             | `file`, `line`, `character`           |
 | `lsp_document_symbols`  | List symbols in a file          | `file`                                |
 | `lsp_workspace_symbols` | Search symbols across workspace | `query` (limit: 100–500 results)      |
-| `lsp_completion`        | Code completion suggestions     | `file`, `line`, `character`           |
 | `lsp_diagnostics`       | Get errors & warnings           | `file` (scope: `file` or `workspace`) |
-| `lsp_signature_help`    | Function signature help         | `file`, `line`, `character`           |
 | `lsp_type_definition`   | Go to type definition           | `file`, `line`, `character`           |
 | `lsp_implementation`    | Find implementations            | `file`, `line`, `character`           |
 | `lsp_health`            | Check status of all LSP servers | _(none)_                              |
@@ -123,7 +120,6 @@ lsp_init({ root: "/path/to/project", languages: ["python", "typescript"] })
 | `lsp_code_action`          | Apply / list code actions | `file`, `line`, `character`, `apply`   |
 | `lsp_formatting`           | Format document           | `file`                                 |
 | `lsp_range_formatting`     | Format code range         | `file`, `range`                        |
-| `lsp_apply_workspace_edit` | Apply raw workspace edit  | `edit` (WorkspaceEdit object)          |
 
 ## Configuration
 
@@ -190,7 +186,7 @@ Each language server runs as a separate process. For large projects with many la
 ┌─────────────────────────────────────────────┐
 │         LSP MCP Server (Node.js)            │
 │  ┌───────────┐ ┌──────────┐ ┌───────────┐  │
-│  │ lsp_hover │ │ lsp_...  │ │ lsp_...   │  │
+│  │ lsp_init  │ │ lsp_...  │ │ lsp_...   │  │
 │  └─────┬─────┘ └────┬─────┘ └─────┬─────┘  │
 │        └─────────────┼─────────────┘        │
 │                      ▼                       │
