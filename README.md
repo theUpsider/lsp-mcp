@@ -32,10 +32,10 @@ A Model Context Protocol (MCP) server that gives language models access to **Lan
 
 - **🔍 Automatic Language Detection** — Scans project root for language markers (`package.json`, `Cargo.toml`, `go.mod`, etc.)
 - **🔄 Auto Language Server Selection** — Hardcoded mapping with fallback servers; installs missing LSPs automatically
-- **� Hands-Free Initialization** — Clients that support [MCP Roots](https://modelcontextprotocol.io/docs/concepts/roots) auto-initialize on connect — `lsp_init` disappears from the tool list once all servers start cleanly
+- **🤖 Hands-Free Initialization** — Clients that support [MCP Roots](https://modelcontextprotocol.io/docs/concepts/roots) auto-initialize on connect — `lsp_init` disappears from the tool list once all servers start cleanly
 - **💾 Cross-Session Persistence** — Initialized workspaces and their ready languages are remembered across server restarts
 - **🔁 Graceful Degradation** — `lsp_init` reappears if a previously-working server starts failing (e.g. language added, binary missing)
-- **�🛠 12 LSP Tools** — Definition, references, symbols, diagnostics, rename, code actions, formatting, and more
+- **🛠 12 LSP Tools** — Definition, references, symbols, diagnostics, rename, code actions, formatting, and more
 - **📝 Read & Write Operations** — Both inspection and modification of code via LSP
 - **🌐 Polyglot Support** — Multiple language servers run simultaneously in the same project
 - **📋 Hybrid Responses** — Human-readable `text` field + raw LSP data in `raw` field
@@ -48,10 +48,10 @@ A Model Context Protocol (MCP) server that gives language models access to **Lan
 
 ```bash
 # npm
-npm install -g @theupsider/lsp-mcp
+npm install -g @theupsider/lsp-mcp@latest
 
 # bun
-bun install -g @theupsider/lsp-mcp
+bun install -g @theupsider/lsp-mcp@latest
 ```
 
 ## Quickstart
@@ -66,7 +66,7 @@ Add to your **workspace** `.vscode/mcp.json` (recommended — ensures the server
     "lsp-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@theupsider/lsp-mcp"]
+      "args": ["-y", "@theupsider/lsp-mcp@latest"]
     }
   }
 }
