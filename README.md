@@ -109,32 +109,32 @@ lsp_init({ root: "/path/to/project", languages: ["python", "typescript"] })
 
 ### Read-Only Tools
 
-| Tool                    | Description                             | Key Parameters                                         | Visibility |
-| ----------------------- | --------------------------------------- | ------------------------------------------------------ | ---------- |
-| `lsp_init`              | Initialize server for a project root    | `root` (required), `languages` (optional string array) | Conditional — hidden when client supports Roots and init succeeds |
-| `lsp_definition`        | Go to definition                | `file`, `line`, `character`           | Always |
-| `lsp_references`        | Find all references             | `file`, `line`, `character`           | Always |
-| `lsp_document_symbols`  | List symbols in a file          | `file`                                | Always |
-| `lsp_workspace_symbols` | Search symbols across workspace | `query` (limit: 100–500 results)      | Always |
-| `lsp_diagnostics`       | Get errors & warnings           | `file` (scope: `file` or `workspace`) | Always |
-| `lsp_type_definition`   | Go to type definition           | `file`, `line`, `character`           | Always |
-| `lsp_implementation`    | Find implementations            | `file`, `line`, `character`           | Always |
-| `lsp_health`            | Check status of all LSP servers | _(none)_                              | Always |
+| Tool                    | Description                          | Key Parameters                                         | Visibility                                                        |
+| ----------------------- | ------------------------------------ | ------------------------------------------------------ | ----------------------------------------------------------------- |
+| `lsp_init`              | Initialize server for a project root | `root` (required), `languages` (optional string array) | Conditional — hidden when client supports Roots and init succeeds |
+| `lsp_definition`        | Go to definition                     | `file`, `line`, `character`                            | Always                                                            |
+| `lsp_references`        | Find all references                  | `file`, `line`, `character`                            | Always                                                            |
+| `lsp_document_symbols`  | List symbols in a file               | `file`                                                 | Always                                                            |
+| `lsp_workspace_symbols` | Search symbols across workspace      | `query` (limit: 100–500 results)                       | Always                                                            |
+| `lsp_diagnostics`       | Get errors & warnings                | `file` (scope: `file` or `workspace`)                  | Always                                                            |
+| `lsp_type_definition`   | Go to type definition                | `file`, `line`, `character`                            | Always                                                            |
+| `lsp_implementation`    | Find implementations                 | `file`, `line`, `character`                            | Always                                                            |
+| `lsp_health`            | Check status of all LSP servers      | _(none)_                                               | Always                                                            |
 
 ### Write Tools
 
-| Tool                       | Description               | Key Parameters                         |
-| -------------------------- | ------------------------- | -------------------------------------- |
-| `lsp_rename`               | Rename symbol             | `file`, `line`, `character`, `newName` |
-| `lsp_code_action`          | Apply / list code actions | `file`, `line`, `character`, `apply`   |
-| `lsp_formatting`           | Format document           | `file`                                 |
-| `lsp_range_formatting`     | Format code range         | `file`, `range`                        |
+| Tool                   | Description               | Key Parameters                         |
+| ---------------------- | ------------------------- | -------------------------------------- |
+| `lsp_rename`           | Rename symbol             | `file`, `line`, `character`, `newName` |
+| `lsp_code_action`      | Apply / list code actions | `file`, `line`, `character`, `apply`   |
+| `lsp_formatting`       | Format document           | `file`                                 |
+| `lsp_range_formatting` | Format code range         | `file`, `range`                        |
 
 ## Configuration
 
-| Environment Variable | Description                         | Default      |
-| -------------------- | ----------------------------------- | ------------ |
-| `LSP_MCP_LOG_LEVEL`  | Log level: `error`, `info`, `debug` | `info`       |
+| Environment Variable | Description                         | Default |
+| -------------------- | ----------------------------------- | ------- |
+| `LSP_MCP_LOG_LEVEL`  | Log level: `error`, `info`, `debug` | `info`  |
 
 ## Setup Scripts
 
