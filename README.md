@@ -32,7 +32,10 @@ A Model Context Protocol (MCP) server that gives language models access to **Lan
 
 - **🔍 Automatic Language Detection** — Scans project root for language markers (`package.json`, `Cargo.toml`, `go.mod`, etc.)
 - **🔄 Auto Language Server Selection** — Hardcoded mapping with fallback servers; installs missing LSPs automatically
-- **🛠 12 LSP Tools** — Definition, references, symbols, diagnostics, rename, code actions, formatting, and more
+- **� Hands-Free Initialization** — Clients that support [MCP Roots](https://modelcontextprotocol.io/docs/concepts/roots) auto-initialize on connect — `lsp_init` disappears from the tool list once all servers start cleanly
+- **💾 Cross-Session Persistence** — Initialized workspaces and their ready languages are remembered across server restarts
+- **🔁 Graceful Degradation** — `lsp_init` reappears if a previously-working server starts failing (e.g. language added, binary missing)
+- **�🛠 12 LSP Tools** — Definition, references, symbols, diagnostics, rename, code actions, formatting, and more
 - **📝 Read & Write Operations** — Both inspection and modification of code via LSP
 - **🌐 Polyglot Support** — Multiple language servers run simultaneously in the same project
 - **📋 Hybrid Responses** — Human-readable `text` field + raw LSP data in `raw` field
@@ -78,7 +81,9 @@ Add to your **workspace** `.vscode/mcp.json` (recommended — ensures the server
 lsp-mcp
 ```
 
-The server starts with no active project. The first action the model must take is calling `lsp_init`:
+The server starts with no active project. **Most clients auto-initialize** when they support the MCP Roots protocol (VS Code, Copilot, etc.) — the `lsp_init` tool simply won't appear in the tool list.
+
+For clients without Roots support, the first action the model must take is calling `lsp_init`:
 
 ```
 lsp_init({ root: "/path/to/your/project" })
@@ -96,21 +101,25 @@ lsp_init({ root: "/path/to/your/project" })
 lsp_init({ root: "/path/to/project", languages: ["python", "typescript"] })
 ```
 
+**Persistence:** Once initialized, the workspace configuration (detected languages) is saved to your OS-standard config directory (`~/.config/lsp-mcp/` on Linux, `~/Library/Application Support/lsp-mcp/` on macOS, `%APPDATA%\lsp-mcp\` on Windows). On subsequent server startups, the MCP server will automatically reconnect using the last-known root, so you rarely need to call `lsp_init` again.
+
+**Re-emergence:** If a language server that was previously healthy fails to start (e.g. you added a new language or removed a binary), `lsp_init` will reappear in the tool list, signaling the model should re-initialize.
+
 ## Available Tools
 
 ### Read-Only Tools
 
-| Tool                    | Description                             | Key Parameters                                         |
-| ----------------------- | --------------------------------------- | ------------------------------------------------------ |
-| `lsp_init`              | Initialize server for a project root    | `root` (required), `languages` (optional string array) |
-| `lsp_definition`        | Go to definition                | `file`, `line`, `character`           |
-| `lsp_references`        | Find all references             | `file`, `line`, `character`           |
-| `lsp_document_symbols`  | List symbols in a file          | `file`                                |
-| `lsp_workspace_symbols` | Search symbols across workspace | `query` (limit: 100–500 results)      |
-| `lsp_diagnostics`       | Get errors & warnings           | `file` (scope: `file` or `workspace`) |
-| `lsp_type_definition`   | Go to type definition           | `file`, `line`, `character`           |
-| `lsp_implementation`    | Find implementations            | `file`, `line`, `character`           |
-| `lsp_health`            | Check status of all LSP servers | _(none)_                              |
+| Tool                    | Description                             | Key Parameters                                         | Visibility |
+| ----------------------- | --------------------------------------- | ------------------------------------------------------ | ---------- |
+| `lsp_init`              | Initialize server for a project root    | `root` (required), `languages` (optional string array) | Conditional — hidden when client supports Roots and init succeeds |
+| `lsp_definition`        | Go to definition                | `file`, `line`, `character`           | Always |
+| `lsp_references`        | Find all references             | `file`, `line`, `character`           | Always |
+| `lsp_document_symbols`  | List symbols in a file          | `file`                                | Always |
+| `lsp_workspace_symbols` | Search symbols across workspace | `query` (limit: 100–500 results)      | Always |
+| `lsp_diagnostics`       | Get errors & warnings           | `file` (scope: `file` or `workspace`) | Always |
+| `lsp_type_definition`   | Go to type definition           | `file`, `line`, `character`           | Always |
+| `lsp_implementation`    | Find implementations            | `file`, `line`, `character`           | Always |
+| `lsp_health`            | Check status of all LSP servers | _(none)_                              | Always |
 
 ### Write Tools
 
