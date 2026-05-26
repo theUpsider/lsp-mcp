@@ -69,8 +69,8 @@ export class McpServer {
     registerReadTools(registrar, lifecycleProxy, {
       initializeManager: async (root, languages) => {
         const result = await this.initializeManager(root, languages);
-        // When lsp_init is called explicitly, hide it on success, re-expose on error
-        this.updateInitVisibility(result.health);
+        // Hide lsp_init only after an explicit init call.
+        this.updateInitVisibility(result.health, "explicit");
         await this.server.server.sendToolListChanged();
         return result;
       },
@@ -79,9 +79,12 @@ export class McpServer {
     this.configureToolHandlers();
 
     // Hook into post-handshake to attempt auto-init from roots or persisted config.
-    // Cast to `() => void` to satisfy the SDK type while still returning the promise
-    // so test harnesses can await it when needed.
-    this.server.server.oninitialized = (() => this.tryAutoInit()) as () => void;
+    const onInitialized = async (): Promise<void> => {
+      await this.tryAutoInit();
+    };
+    this.server.server.oninitialized = () => {
+      void onInitialized();
+    };
 
     // Handle roots/list_changed: client switched workspace
     this.server.server.setNotificationHandler(
@@ -141,9 +144,10 @@ export class McpServer {
 
   private updateInitVisibility(
     health: ReturnType<LifecycleManager["getHealth"]>,
+    source: "explicit" | "auto",
   ): void {
     const hasErrors = health.some((entry) => entry.status === "error");
-    this.hideInitTool = !hasErrors;
+    this.hideInitTool = source === "explicit" && !hasErrors;
   }
 
   private async tryAutoInit(): Promise<void> {
@@ -184,7 +188,7 @@ export class McpServer {
     const languages = saved?.languages;
 
     const result = await this.initializeManager(root, languages);
-    this.updateInitVisibility(result.health);
+    this.updateInitVisibility(result.health, "auto");
 
     // Persist successful init so we can restore on next startup
     const readyLanguages = result.health
@@ -244,7 +248,7 @@ export class McpServer {
           pipeStrategy: "input",
         })
       : {};
-    return { type: "object", ...result } as Tool["inputSchema"];
+    return { type: "object", ...result };
   }
 
   private createLifecycleProxy(): MinimalLifecycleManager {

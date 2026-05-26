@@ -81,7 +81,7 @@ Add to your **workspace** `.vscode/mcp.json` (recommended — ensures the server
 lsp-mcp
 ```
 
-The server starts with no active project. **Most clients auto-initialize** when they support the MCP Roots protocol (VS Code, Copilot, etc.) — the `lsp_init` tool simply won't appear in the tool list.
+The server starts with no active project. **Most clients auto-initialize** when they support the MCP Roots protocol (VS Code, Copilot, etc.), but `lsp_init` remains available as a manual override.
 
 For clients without Roots support, the first action the model must take is calling `lsp_init`:
 
@@ -92,7 +92,7 @@ lsp_init({ root: "/path/to/your/project" })
 `lsp_init` will:
 
 1. Scan the root for language markers and start matching language servers (best-effort)
-2. Disappear from the tool list — subsequent calls to any LSP tool trigger lazy server startup for that file's language if no server was detected at init time
+2. Disappear from the tool list when you called it explicitly — subsequent calls to any LSP tool trigger lazy server startup for that file's language if no server was detected at init time
 3. Return health status for all servers that were started eagerly
 
 **Optional: pre-warm specific languages** (skips detection, faster cold start):
@@ -109,17 +109,17 @@ lsp_init({ root: "/path/to/project", languages: ["python", "typescript"] })
 
 ### Read-Only Tools
 
-| Tool                    | Description                          | Key Parameters                                         | Visibility                                                        |
-| ----------------------- | ------------------------------------ | ------------------------------------------------------ | ----------------------------------------------------------------- |
-| `lsp_init`              | Initialize server for a project root | `root` (required), `languages` (optional string array) | Conditional — hidden when client supports Roots and init succeeds |
-| `lsp_definition`        | Go to definition                     | `file`, `line`, `character`                            | Always                                                            |
-| `lsp_references`        | Find all references                  | `file`, `line`, `character`                            | Always                                                            |
-| `lsp_document_symbols`  | List symbols in a file               | `file`                                                 | Always                                                            |
-| `lsp_workspace_symbols` | Search symbols across workspace      | `query` (limit: 100–500 results)                       | Always                                                            |
-| `lsp_diagnostics`       | Get errors & warnings                | `file` (scope: `file` or `workspace`)                  | Always                                                            |
-| `lsp_type_definition`   | Go to type definition                | `file`, `line`, `character`                            | Always                                                            |
-| `lsp_implementation`    | Find implementations                 | `file`, `line`, `character`                            | Always                                                            |
-| `lsp_health`            | Check status of all LSP servers      | _(none)_                                               | Always                                                            |
+| Tool                    | Description                          | Key Parameters                                         | Visibility                                                       |
+| ----------------------- | ------------------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| `lsp_init`              | Initialize server for a project root | `root` (required), `languages` (optional string array) | Conditional — hidden after a successful explicit `lsp_init` call |
+| `lsp_definition`        | Go to definition                     | `file`, `line`, `character`                            | Always                                                           |
+| `lsp_references`        | Find all references                  | `file`, `line`, `character`                            | Always                                                           |
+| `lsp_document_symbols`  | List symbols in a file               | `file`                                                 | Always                                                           |
+| `lsp_workspace_symbols` | Search symbols across workspace      | `query` (limit: 100–500 results)                       | Always                                                           |
+| `lsp_diagnostics`       | Get errors & warnings                | `file` (scope: `file` or `workspace`)                  | Always                                                           |
+| `lsp_type_definition`   | Go to type definition                | `file`, `line`, `character`                            | Always                                                           |
+| `lsp_implementation`    | Find implementations                 | `file`, `line`, `character`                            | Always                                                           |
+| `lsp_health`            | Check status of all LSP servers      | _(none)_                                               | Always                                                           |
 
 ### Write Tools
 

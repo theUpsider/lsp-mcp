@@ -52,6 +52,10 @@ function getHandler(schema: unknown): Function {
   return call[1];
 }
 
+async function flushAutoInit(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
 describe("McpServer", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -121,7 +125,7 @@ describe("McpServer", () => {
     );
   });
 
-  it("hides lsp_init after successful auto-init (all servers ready)", async () => {
+  it("keeps lsp_init visible after successful auto-init (all servers ready)", async () => {
     const readTools = jest.requireMock("../tools/read-tools")
       .registerReadTools as jest.Mock;
     const writeTools = jest.requireMock("../tools/write-tools")
@@ -172,13 +176,13 @@ describe("McpServer", () => {
     );
     await server.start();
 
-    // Trigger the oninitialized callback
-    await mockInnerServer.oninitialized!();
+    mockInnerServer.oninitialized!();
+    await flushAutoInit();
 
     const listHandler = getHandler(ListToolsRequestSchema);
     const result = await listHandler({});
 
-    expect(result.tools.map((t: { name: string }) => t.name)).not.toContain(
+    expect(result.tools.map((t: { name: string }) => t.name)).toContain(
       "lsp_init",
     );
     expect(result.tools.map((t: { name: string }) => t.name)).toContain(
@@ -232,7 +236,8 @@ describe("McpServer", () => {
     );
     await server.start();
 
-    await mockInnerServer.oninitialized!();
+    mockInnerServer.oninitialized!();
+    await flushAutoInit();
 
     const listHandler = getHandler(ListToolsRequestSchema);
     const result = await listHandler({});
@@ -272,10 +277,79 @@ describe("McpServer", () => {
     );
     await server.start();
 
-    await mockInnerServer.oninitialized!();
+    mockInnerServer.oninitialized!();
+    await flushAutoInit();
 
     expect(manager.start).toHaveBeenCalled();
-    expect(server.isInitToolHidden()).toBe(true);
+    expect(server.isInitToolHidden()).toBe(false);
+  });
+
+  it("hides lsp_init after a successful explicit init", async () => {
+    const readTools = jest.requireMock("../tools/read-tools")
+      .registerReadTools as jest.Mock;
+    const writeTools = jest.requireMock("../tools/write-tools")
+      .registerWriteTools as jest.Mock;
+
+    readTools.mockImplementationOnce(
+      (
+        registrar: { registerTool: Function },
+        _lifecycle: unknown,
+        options: {
+          initializeManager: (root: string) => Promise<{
+            root: string;
+            health: Array<{ language: string; status: string }>;
+          }>;
+        },
+      ) => {
+        registrar.registerTool(
+          "lsp_init",
+          { description: "init" },
+          async (args: { root: string }) => {
+            const result = await options.initializeManager(args.root);
+            return {
+              content: [{ type: "text", text: result.root }],
+              raw: result,
+            };
+          },
+        );
+      },
+    );
+    writeTools.mockImplementationOnce(() => undefined);
+
+    const health = [{ language: "typescript", status: "ready" }];
+    const manager = {
+      start: jest.fn().mockResolvedValue(undefined),
+      shutdown: jest.fn().mockResolvedValue(undefined),
+      getHealth: jest.fn().mockReturnValue(health),
+    };
+    const factory = jest.fn().mockReturnValue(manager);
+
+    const { CallToolRequestSchema, ListToolsRequestSchema } =
+      jest.requireActual("@modelcontextprotocol/sdk/types.js") as {
+        CallToolRequestSchema: unknown;
+        ListToolsRequestSchema: unknown;
+      };
+
+    const server = new McpServer(
+      "info",
+      factory as unknown as (
+        root: string,
+        logLevel: string,
+      ) => LifecycleManager,
+    );
+    await server.start();
+
+    const callHandler = getHandler(CallToolRequestSchema);
+    await callHandler({
+      params: { name: "lsp_init", arguments: { root: "/workspace/project" } },
+    });
+
+    const listHandler = getHandler(ListToolsRequestSchema);
+    const result = await listHandler({});
+
+    expect(result.tools.map((t: { name: string }) => t.name)).not.toContain(
+      "lsp_init",
+    );
   });
 
   it("returns no-root error for non-init tools before initialization", async () => {
