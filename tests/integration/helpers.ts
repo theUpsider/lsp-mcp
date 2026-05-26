@@ -168,7 +168,7 @@ function createLifecycleManager(client: LspClient, language: string): MinimalLif
 
 function extractText(result: McpToolResult): string {
   const item = result.content[0];
-  if (!item || item.type !== 'text') {
+  if (item?.type !== 'text') {
     throw new Error('Unexpected MCP tool response shape');
   }
 
