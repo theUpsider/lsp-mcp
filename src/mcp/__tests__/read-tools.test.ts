@@ -410,6 +410,103 @@ describe("registerReadTools", () => {
     });
   });
 
+  it("returns a structured error instead of throwing when workspace analysis fails (regression)", async () => {
+    const registrar = new FakeRegistrar();
+    const lifecycle = createLifecycle({ diagnostics: [] });
+    lifecycle.analyzeWorkspace.mockRejectedValueOnce(new Error("boom"));
+
+    registerReadTools(registrar, lifecycle, { initializeManager: jest.fn() });
+
+    await expect(
+      getHandler(registrar, "lsp_diagnostics")({ scope: "workspace" }),
+    ).resolves.toMatchObject({
+      content: [{ type: "text", text: "boom" }],
+      error: true,
+    });
+  });
+
+  it("reports the standard timeout message when workspace analysis times out (regression)", async () => {
+    const registrar = new FakeRegistrar();
+    const lifecycle = createLifecycle({ diagnostics: [] });
+    lifecycle.analyzeWorkspace.mockRejectedValueOnce(
+      new Error("Workspace diagnostics timed out"),
+    );
+
+    registerReadTools(registrar, lifecycle, { initializeManager: jest.fn() });
+
+    await expect(
+      getHandler(registrar, "lsp_diagnostics")({ scope: "workspace" }),
+    ).resolves.toEqual({
+      content: [
+        {
+          type: "text",
+          text: "Operation timed out after 30s — try a more specific query or check the LSP server health",
+        },
+      ],
+      error: true,
+      raw: null,
+    });
+  });
+
+  it("caps workspace diagnostics at 200 results", async () => {
+    const registrar = new FakeRegistrar();
+    const many = Array.from({ length: 250 }, (_, i) => ({
+      uri: `file:///workspace/src/file${i}.ts`,
+      message: `issue ${i}`,
+      severity: DiagnosticSeverity.Warning,
+      range: {
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: 1 },
+      },
+    }));
+    const lifecycle = createLifecycle({ diagnostics: many });
+
+    registerReadTools(registrar, lifecycle, { initializeManager: jest.fn() });
+
+    const result = (await getHandler(
+      registrar,
+      "lsp_diagnostics",
+    )({ scope: "workspace" })) as { raw: unknown[] };
+
+    expect(result.raw).toHaveLength(200);
+    expect(result.raw).toEqual(many.slice(0, 200));
+  });
+
+  it("notes truncated/errored languages in workspace diagnostics text without altering raw (regression)", async () => {
+    const registrar = new FakeRegistrar();
+    const diagnostics = [
+      {
+        uri: "file:///workspace/src/index.ts",
+        message: "Boom",
+        severity: DiagnosticSeverity.Error,
+        range: {
+          start: { line: 0, character: 0 },
+          end: { line: 0, character: 1 },
+        },
+      },
+    ];
+    const lifecycle = createLifecycle({ diagnostics });
+    lifecycle.analyzeWorkspace.mockResolvedValueOnce({
+      perLanguage: [
+        { language: "python", opened: 90, failed: 3, truncated: true },
+      ],
+    });
+
+    registerReadTools(registrar, lifecycle, { initializeManager: jest.fn() });
+
+    const result = (await getHandler(
+      registrar,
+      "lsp_diagnostics",
+    )({ scope: "workspace" })) as {
+      content: Array<{ text: string }>;
+      raw: unknown;
+    };
+
+    expect(result.content[0]?.text).toContain("100-file scan limit");
+    expect(result.content[0]?.text).toContain("python");
+    expect(result.raw).toEqual(diagnostics);
+  });
+
   it("returns health instantly without LSP requests", async () => {
     const registrar = new FakeRegistrar();
     const lifecycle = createLifecycle({
@@ -630,7 +727,7 @@ function createLifecycle(options: {
     getHealth: jest.fn(() => options.health ?? []),
     ensureLanguageForFile: jest.fn().mockResolvedValue(undefined),
     ensureSeedFilesOpen: jest.fn().mockResolvedValue(undefined),
-    analyzeWorkspace: jest.fn().mockResolvedValue(undefined),
+    analyzeWorkspace: jest.fn().mockResolvedValue({ perLanguage: [] }),
   };
 }
 
@@ -665,7 +762,7 @@ interface MockLifecycle {
   getHealth: jest.Mock<LanguageServerHealth[], []>;
   ensureLanguageForFile: jest.Mock<Promise<void>, [string]>;
   ensureSeedFilesOpen: jest.Mock<Promise<void>, []>;
-  analyzeWorkspace: jest.Mock<Promise<void>, [string?]>;
+  analyzeWorkspace: jest.Mock<Promise<any>, [string?]>;
 }
 
 type DiagnosticRecord = Diagnostic & { uri?: string };

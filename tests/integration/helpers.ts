@@ -205,7 +205,7 @@ function createLifecycleManager(
     getHealth: () => health,
     ensureLanguageForFile: async () => undefined,
     ensureSeedFilesOpen: async () => undefined,
-    analyzeWorkspace: async () => undefined,
+    analyzeWorkspace: async () => ({ perLanguage: [] }),
   };
 }
 

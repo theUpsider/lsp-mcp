@@ -302,7 +302,7 @@ describe("registerWriteTools", () => {
       getHealth: jest.fn(() => []),
       ensureLanguageForFile: jest.fn().mockResolvedValue(undefined),
       ensureSeedFilesOpen: jest.fn().mockResolvedValue(undefined),
-      analyzeWorkspace: jest.fn().mockResolvedValue(undefined),
+      analyzeWorkspace: jest.fn().mockResolvedValue({ perLanguage: [] }),
     };
     registerWriteTools(registrar, noClientLifecycle);
 
@@ -426,7 +426,7 @@ function createLifecycle(client: MockClient): MockLifecycle {
     getHealth: jest.fn(() => []),
     ensureLanguageForFile: jest.fn().mockResolvedValue(undefined),
     ensureSeedFilesOpen: jest.fn().mockResolvedValue(undefined),
-    analyzeWorkspace: jest.fn().mockResolvedValue(undefined),
+    analyzeWorkspace: jest.fn().mockResolvedValue({ perLanguage: [] }),
   };
 }
 
@@ -471,5 +471,5 @@ interface MockLifecycle {
   getHealth: jest.Mock<[], []>;
   ensureLanguageForFile: jest.Mock<Promise<void>, [string]>;
   ensureSeedFilesOpen: jest.Mock<Promise<void>, []>;
-  analyzeWorkspace: jest.Mock<Promise<void>, [string?]>;
+  analyzeWorkspace: jest.Mock<Promise<any>, [string?]>;
 }

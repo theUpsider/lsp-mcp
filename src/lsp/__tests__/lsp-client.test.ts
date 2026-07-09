@@ -1,4 +1,7 @@
 import { EventEmitter } from 'node:events';
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 
 import { LspClient } from '../lsp-client';
@@ -272,6 +275,99 @@ describe('LspClient', () => {
     child.stdout.write(encodeMessage({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: 'file:///x', diagnostics: [] } }));
 
     await expect(notificationPromise).resolves.toEqual({ method: 'textDocument/publishDiagnostics', params: { uri: 'file:///x', diagnostics: [] } });
+  });
+
+  describe('openAllFilesForDiagnostics (workspace scan regressions)', () => {
+    let tmpDir: string;
+
+    beforeEach(async () => {
+      tmpDir = await mkdtemp(path.join(tmpdir(), 'lsp-client-scan-'));
+    });
+
+    afterEach(async () => {
+      await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    // Publish notifications never arrive in this test (no real server), so
+    // shorten the wait so these regression tests run fast under real timers
+    // instead of racing fake timers against real fs I/O.
+    function withShortDiagnosticsWait(client: LspClient): void {
+      const original = client.waitForDiagnosticsPublish.bind(client);
+      client.waitForDiagnosticsPublish = (filePath: string) =>
+        original(filePath, 50);
+    }
+
+    it('does not let one unreadable file abort the whole scan (regression)', async () => {
+      const child = new MockChildProcess();
+      const spawn = jest.requireMock('node:child_process').spawn as jest.MockedFunction<SpawnMock>;
+      spawn.mockReturnValue(child as unknown as ReturnType<SpawnMock>);
+      const client = new LspClient(SERVER, tmpDir, 'error');
+      await startClient(client, child);
+      withShortDiagnosticsWait(client);
+
+      await writeFile(path.join(tmpDir, 'a.ts'), 'const a = 1;\n');
+      await writeFile(path.join(tmpDir, 'b.ts'), 'const b = 1;\n');
+      const brokenPath = path.join(tmpDir, 'broken.ts');
+      await writeFile(brokenPath, 'const c = 1;\n');
+      await chmod(brokenPath, 0o000);
+
+      if (process.getuid?.() === 0) {
+        // Running as root: chmod 0o000 does not block reads, so this test cannot apply.
+        return;
+      }
+
+      const summary = await client.openAllFilesForDiagnostics(['.ts']);
+
+      expect(summary).toEqual({ opened: 2, failed: 1, truncated: false });
+    }, 10000);
+
+    it('skips virtualenv-style directories during the workspace scan (regression)', async () => {
+      const child = new MockChildProcess();
+      const spawn = jest.requireMock('node:child_process').spawn as jest.MockedFunction<SpawnMock>;
+      spawn.mockReturnValue(child as unknown as ReturnType<SpawnMock>);
+      const client = new LspClient(SERVER, tmpDir, 'error');
+      await startClient(client, child);
+      withShortDiagnosticsWait(client);
+
+      await writeFile(path.join(tmpDir, 'top1.py'), 'x = 1\n');
+      await writeFile(path.join(tmpDir, 'top2.py'), 'y = 2\n');
+      const venvPkgDir = path.join(tmpDir, '.venv', 'lib', 'site-packages');
+      await mkdir(venvPkgDir, { recursive: true });
+      await Promise.all(
+        Array.from({ length: 5 }, (_, i) =>
+          writeFile(path.join(venvPkgDir, `dep${i}.py`), `dep = ${i}\n`),
+        ),
+      );
+
+      const summary = await client.openAllFilesForDiagnostics(['.py']);
+
+      expect(summary).toEqual({ opened: 2, failed: 0, truncated: false });
+      const openedUris = child.stdinWrites
+        .map((raw) => extractMessage(raw))
+        .filter((message) => message.method === 'textDocument/didOpen')
+        .map((message) => getObject(message.params).textDocument as { uri: string })
+        .map((textDocument) => textDocument.uri);
+      expect(openedUris.some((uri) => uri.includes('.venv'))).toBe(false);
+    }, 10000);
+
+    it('caps the workspace scan at 100 files per language and reports truncation', async () => {
+      const child = new MockChildProcess();
+      const spawn = jest.requireMock('node:child_process').spawn as jest.MockedFunction<SpawnMock>;
+      spawn.mockReturnValue(child as unknown as ReturnType<SpawnMock>);
+      const client = new LspClient(SERVER, tmpDir, 'error');
+      await startClient(client, child);
+      withShortDiagnosticsWait(client);
+
+      await Promise.all(
+        Array.from({ length: 150 }, (_, i) =>
+          writeFile(path.join(tmpDir, `file${i}.ts`), `const v${i} = ${i};\n`),
+        ),
+      );
+
+      const summary = await client.openAllFilesForDiagnostics(['.ts']);
+
+      expect(summary).toEqual({ opened: 100, failed: 0, truncated: true });
+    }, 10000);
   });
 });
 

@@ -8,7 +8,10 @@ import type {
 } from "vscode-languageserver-protocol";
 import type { ZodType } from "zod";
 
-import type { LanguageServerHealth } from "../../lsp/lifecycle-manager";
+import type {
+  LanguageServerHealth,
+  WorkspaceAnalysisSummary,
+} from "../../lsp/lifecycle-manager";
 
 import { uriToPath } from "../../utils/uri";
 
@@ -37,7 +40,7 @@ export interface MinimalLifecycleManager {
   getHealth(): LanguageServerHealth[];
   ensureLanguageForFile(filePath: string): Promise<void>;
   ensureSeedFilesOpen(): Promise<void>;
-  analyzeWorkspace(language?: string): Promise<void>;
+  analyzeWorkspace(language?: string): Promise<WorkspaceAnalysisSummary>;
 }
 
 export interface McpToolResult {

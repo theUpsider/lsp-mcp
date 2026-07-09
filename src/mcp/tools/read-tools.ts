@@ -29,6 +29,7 @@ import {
 } from "./shared";
 
 import type { LanguageServerHealth } from "../../lsp/lifecycle-manager";
+import { promiseWithTimeout } from "../../lsp/lifecycle-manager";
 
 interface ReadToolOptions {
   initializeManager(
@@ -153,35 +154,59 @@ export function registerReadTools(
     async (args) => {
       const filePath = typeof args.file === "string" ? args.file : "";
       const scope = args.scope === "workspace" ? "workspace" : "file";
+      const timeoutSeconds = scope === "workspace" ? 30 : 10;
 
-      if (filePath) {
-        await lifecycleManager.ensureLanguageForFile(filePath);
-        const client = lifecycleManager.getClientForFile(filePath);
-        if (client) {
-          const waitPromise = client.waitForDiagnosticsPublish(filePath, 10000);
-          await client.ensureDidOpen(filePath);
-          client.notify("textDocument/didSave", {
-            textDocument: { uri: pathToUri(filePath) },
-          });
-          await waitPromise;
+      try {
+        if (filePath) {
+          await lifecycleManager.ensureLanguageForFile(filePath);
+          const client = lifecycleManager.getClientForFile(filePath);
+          if (client) {
+            const waitPromise = client.waitForDiagnosticsPublish(
+              filePath,
+              10000,
+            );
+            await client.ensureDidOpen(filePath);
+            client.notify("textDocument/didSave", {
+              textDocument: { uri: pathToUri(filePath) },
+            });
+            await waitPromise;
+          }
         }
-      }
 
-      if (scope === "workspace") {
-        const language =
-          typeof args.language === "string" ? args.language : undefined;
-        await lifecycleManager.analyzeWorkspace(language);
-        const diagnostics = lifecycleManager
-          .getWorkspaceDiagnostics(language)
-          .slice(0, 200);
-        return success(
-          formatDiagnostics(diagnostics, "workspace"),
-          diagnostics,
-        );
-      }
+        if (scope === "workspace") {
+          const language =
+            typeof args.language === "string" ? args.language : undefined;
+          const summary = await promiseWithTimeout(
+            lifecycleManager.analyzeWorkspace(language),
+            30000,
+            "Workspace diagnostics timed out",
+          );
+          const diagnostics = lifecycleManager
+            .getWorkspaceDiagnostics(language)
+            .slice(0, 200);
 
-      const diagnostics = lifecycleManager.getFileDiagnostics(filePath);
-      return success(formatDiagnostics(diagnostics, "file"), diagnostics);
+          let text = formatDiagnostics(diagnostics, "workspace");
+          const truncated = summary.perLanguage
+            .filter((entry) => entry.truncated)
+            .map((entry) => entry.language);
+          const errored = summary.perLanguage
+            .filter((entry) => entry.error)
+            .map((entry) => `${entry.language}: ${entry.error}`);
+          if (truncated.length > 0) {
+            text += `\n\nNote: hit the 100-file scan limit for: ${truncated.join(", ")}. Results may be incomplete — narrow scope with { language }.`;
+          }
+          if (errored.length > 0) {
+            text += `\n\nNote: workspace scan failed for: ${errored.join("; ")}. Other languages were unaffected.`;
+          }
+
+          return success(text, diagnostics);
+        }
+
+        const diagnostics = lifecycleManager.getFileDiagnostics(filePath);
+        return success(formatDiagnostics(diagnostics, "file"), diagnostics);
+      } catch (error) {
+        return mapToolError(error, timeoutSeconds);
+      }
     },
   );
 

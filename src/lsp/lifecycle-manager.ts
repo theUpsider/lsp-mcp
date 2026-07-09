@@ -22,6 +22,16 @@ export interface LanguageServerHealth {
   capabilities?: ServerCapabilities;
 }
 
+export interface WorkspaceAnalysisSummary {
+  perLanguage: Array<{
+    language: string;
+    opened: number;
+    failed: number;
+    truncated: boolean;
+    error?: string;
+  }>;
+}
+
 export class LifecycleManager {
   private readonly projectRoot: string;
   private readonly logLevel: "error" | "info" | "debug";
@@ -101,8 +111,10 @@ export class LifecycleManager {
     return this.store.getForWorkspace(language);
   }
 
-  public async analyzeWorkspace(language?: string): Promise<void> {
-    await Promise.all(
+  public async analyzeWorkspace(
+    language?: string,
+  ): Promise<WorkspaceAnalysisSummary> {
+    const results = await Promise.allSettled(
       Array.from(this.supervisors.entries())
         .filter(([lang, supervisor]) => {
           const health = supervisor.getHealth();
@@ -110,11 +122,42 @@ export class LifecycleManager {
         })
         .map(async ([lang, supervisor]) => {
           const client = supervisor.getClient();
-          if (!client) return;
+          if (!client) {
+            return { language: lang, opened: 0, failed: 0, truncated: false };
+          }
+
           const extensions = extensionsForLanguage(lang);
-          await client.openAllFilesForDiagnostics(extensions);
+          try {
+            const scan = await client.openAllFilesForDiagnostics(extensions);
+            return { language: lang, ...scan };
+          } catch (error) {
+            return {
+              language: lang,
+              opened: 0,
+              failed: 0,
+              truncated: false,
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
         }),
     );
+
+    return {
+      perLanguage: results.map((result) =>
+        result.status === "fulfilled"
+          ? result.value
+          : {
+              language: "unknown",
+              opened: 0,
+              failed: 0,
+              truncated: false,
+              error:
+                result.reason instanceof Error
+                  ? result.reason.message
+                  : String(result.reason),
+            },
+      ),
+    };
   }
 
   public async ensureSeedFilesOpen(): Promise<void> {
@@ -185,7 +228,7 @@ function normalizeLogLevel(level: string): "error" | "info" | "debug" {
   return "info";
 }
 
-async function promiseWithTimeout<T>(
+export async function promiseWithTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
   message: string,

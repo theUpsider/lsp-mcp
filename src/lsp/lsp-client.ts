@@ -11,6 +11,12 @@ import { pathToUri } from "../utils/uri";
 
 type LogLevel = "error" | "info" | "debug";
 
+export interface FileScanSummary {
+  opened: number;
+  failed: number;
+  truncated: boolean;
+}
+
 interface JsonRpcRequest {
   jsonrpc: "2.0";
   id: number;
@@ -253,7 +259,9 @@ export class LspClient extends EventEmitter {
     }
   }
 
-  public async openAllFilesForDiagnostics(extensions: string[]): Promise<void> {
+  public async openAllFilesForDiagnostics(
+    extensions: string[],
+  ): Promise<FileScanSummary> {
     const MAX_FILES = 100;
     const allFiles = await findAllFilesWithExtension(
       this.projectRoot,
@@ -261,9 +269,10 @@ export class LspClient extends EventEmitter {
       MAX_FILES,
     );
     const newFiles = allFiles.filter((f) => !this.openedFiles.has(f));
+    const truncated = allFiles.length >= MAX_FILES;
 
     if (newFiles.length === 0) {
-      return;
+      return { opened: 0, failed: 0, truncated };
     }
 
     // Set up wait promises BEFORE opening files to avoid missing notifications
@@ -271,8 +280,16 @@ export class LspClient extends EventEmitter {
       this.waitForDiagnosticsPublish(f, 15000),
     );
 
-    await Promise.all(newFiles.map((f) => this.ensureDidOpen(f)));
-    await Promise.all(waitPromises);
+    const openResults = await Promise.allSettled(
+      newFiles.map((f) => this.ensureDidOpen(f)),
+    );
+    await Promise.allSettled(waitPromises);
+
+    const failed = openResults.filter(
+      (result) => result.status === "rejected",
+    ).length;
+
+    return { opened: newFiles.length - failed, failed, truncated };
   }
 
   private sendMessage(message: JsonRpcMessage): void {
@@ -448,6 +465,13 @@ const SKIP_DIRS = new Set([
   "target",
   ".cache",
   "vendor",
+  ".venv",
+  "venv",
+  ".tox",
+  ".mypy_cache",
+  ".pytest_cache",
+  ".idea",
+  ".gradle",
 ]);
 
 async function findFirstFileWithExtension(
