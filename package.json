@@ -1,6 +1,6 @@
 {
   "name": "@theupsider/lsp-mcp",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Universal LSP MCP server",
   "license": "Apache-2.0",
   "type": "commonjs",
