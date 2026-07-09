@@ -255,6 +255,8 @@ export class McpServer {
     return {
       getClientForFile: (filePath) =>
         this.requireManager().getClientForFile(filePath),
+      getDiagnosticClientsForFile: (filePath) =>
+        this.requireManager().getDiagnosticClientsForFile(filePath),
       getReadyClients: (language) =>
         this.requireManager().getReadyClients(language),
       getFileDiagnostics: (filePath) =>

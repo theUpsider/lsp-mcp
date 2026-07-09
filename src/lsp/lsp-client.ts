@@ -194,7 +194,9 @@ export class LspClient extends EventEmitter {
       return;
     }
 
-    await this.request("shutdown", {}, 5000);
+    // The LSP spec defines shutdown as taking no params; strict servers (e.g. ruff,
+    // written in Rust with serde) reject an empty object `{}` as "expected unit".
+    await this.request("shutdown", null, 5000);
     this.notify("exit", {});
     this.ready = false;
     const currentProcess = this.process;

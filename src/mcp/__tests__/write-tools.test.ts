@@ -296,6 +296,7 @@ describe("registerWriteTools", () => {
     const registrar = new FakeRegistrar();
     const noClientLifecycle = {
       getClientForFile: jest.fn(() => null),
+      getDiagnosticClientsForFile: jest.fn(() => []),
       getReadyClients: jest.fn(() => []),
       getFileDiagnostics: jest.fn((_: string) => []),
       getWorkspaceDiagnostics: jest.fn(() => []),
@@ -420,6 +421,7 @@ function getHandler(
 function createLifecycle(client: MockClient): MockLifecycle {
   return {
     getClientForFile: jest.fn((_: string) => client),
+    getDiagnosticClientsForFile: jest.fn((_: string) => [client]),
     getReadyClients: jest.fn(() => [client]),
     getFileDiagnostics: jest.fn((_: string) => []),
     getWorkspaceDiagnostics: jest.fn(() => []),
@@ -465,6 +467,7 @@ interface MockClient {
 
 interface MockLifecycle {
   getClientForFile: jest.Mock<MockClient | null, [string]>;
+  getDiagnosticClientsForFile: jest.Mock<MockClient[], [string]>;
   getReadyClients: jest.Mock<MockClient[], [string?]>;
   getFileDiagnostics: jest.Mock<[], [string]>;
   getWorkspaceDiagnostics: jest.Mock<[], [string?]>;

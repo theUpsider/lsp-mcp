@@ -13,34 +13,54 @@ interface PublishDiagnosticsParams {
 }
 
 export class DiagnosticStore {
-  private readonly diagnostics = new Map<string, DiagnosticEntry[]>();
+  // uri -> sourceId -> diagnostics. Keying by source lets multiple servers for the
+  // same language (e.g. pyright's type checks and ruff's lint rules) publish
+  // diagnostics for the same file without one server's publish overwriting another's.
+  private readonly diagnostics = new Map<string, Map<string, DiagnosticEntry[]>>();
 
-  public store(params: unknown): void {
+  public store(sourceId: string, params: unknown): void {
     if (!isPublishDiagnosticsParams(params)) {
       return;
     }
 
-    this.diagnostics.set(params.uri, cloneDiagnostics(params.diagnostics));
+    let bySource = this.diagnostics.get(params.uri);
+    if (!bySource) {
+      bySource = new Map();
+      this.diagnostics.set(params.uri, bySource);
+    }
+
+    bySource.set(sourceId, cloneDiagnostics(params.diagnostics));
   }
 
   public getForFile(filePath: string): Array<DiagnosticEntry & { uri: string }> {
     const uri = pathToUri(filePath);
-    return (this.diagnostics.get(uri) ?? []).map((diagnostic) => ({ ...diagnostic, uri }));
+    return this.flatten(uri);
   }
 
   public getForWorkspace(language?: string): Array<DiagnosticEntry & { uri: string }> {
     const allowedExtensions = language ? extensionsForLanguage(language) : null;
 
-    return Array.from(this.diagnostics.entries())
-      .filter(([uri]) => {
+    return Array.from(this.diagnostics.keys())
+      .filter((uri) => {
         if (!allowedExtensions) {
           return true;
         }
 
         return allowedExtensions.includes(path.extname(uriToPath(uri)).toLowerCase());
       })
-      .flatMap(([uri, diagnostics]) => diagnostics.map((diagnostic) => ({ ...diagnostic, uri })))
+      .flatMap((uri) => this.flatten(uri))
       .sort((left, right) => (left.severity ?? 4) - (right.severity ?? 4));
+  }
+
+  private flatten(uri: string): Array<DiagnosticEntry & { uri: string }> {
+    const bySource = this.diagnostics.get(uri);
+    if (!bySource) {
+      return [];
+    }
+
+    return Array.from(bySource.values()).flatMap((diagnostics) =>
+      diagnostics.map((diagnostic) => ({ ...diagnostic, uri }))
+    );
   }
 }
 

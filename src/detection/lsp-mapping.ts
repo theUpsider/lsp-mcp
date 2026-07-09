@@ -18,6 +18,15 @@ const CLANGD_CANDIDATES: LspCandidate[] = [
   { cmd: 'clangd', args: [], pkg: 'clangd', mgr: 'apt' }
 ];
 
+// Linters that run alongside (not instead of) the primary language server for a
+// language, so their diagnostics (e.g. ruff lint rules) show up next to the
+// primary server's diagnostics (e.g. pyright type errors) instead of being lost.
+const LANGUAGE_TO_LINTERS: Record<string, LspCandidate[]> = {
+  python: [
+    { cmd: 'ruff', args: ['server', '--quiet'], pkg: 'ruff', mgr: 'pip' }
+  ]
+};
+
 const LANGUAGE_TO_CANDIDATES: Record<string, LspCandidate[]> = {
   python: [
     { cmd: 'pyright-langserver', args: ['--stdio'], pkg: 'pyright', mgr: 'npm' },
@@ -74,9 +83,19 @@ export function getLspCandidates(language: string): LspCandidate[] {
   return LANGUAGE_TO_CANDIDATES[language]?.map((candidate) => ({ ...candidate, args: [...candidate.args] })) ?? [];
 }
 
-export async function findAvailableLsp(language: string): Promise<LspCandidate | null> {
-  const candidates = getLspCandidates(language);
+export function getLinterCandidates(language: string): LspCandidate[] {
+  return LANGUAGE_TO_LINTERS[language]?.map((candidate) => ({ ...candidate, args: [...candidate.args] })) ?? [];
+}
 
+export async function findAvailableLsp(language: string): Promise<LspCandidate | null> {
+  return await findFirstAvailable(getLspCandidates(language));
+}
+
+export async function findAvailableLinter(language: string): Promise<LspCandidate | null> {
+  return await findFirstAvailable(getLinterCandidates(language));
+}
+
+async function findFirstAvailable(candidates: LspCandidate[]): Promise<LspCandidate | null> {
   for (const candidate of candidates) {
     if (await commandExists(candidate.cmd)) {
       return candidate;

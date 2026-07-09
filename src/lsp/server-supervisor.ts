@@ -1,7 +1,9 @@
 import type { ServerCapabilities } from "vscode-languageserver-protocol";
 
 import {
+  findAvailableLinter,
   findAvailableLsp,
+  getLinterCandidates,
   getLspCandidates,
   type LspCandidate,
 } from "../detection/lsp-mapping";
@@ -33,6 +35,7 @@ export class ServerSupervisor {
   private readonly projectRoot: string;
   private readonly logLevel: LogLevel;
   private readonly onDiagnostics: (method: string, params: unknown) => void;
+  private readonly linter: boolean;
   private shuttingDown = false;
 
   public constructor(
@@ -40,11 +43,13 @@ export class ServerSupervisor {
     projectRoot: string,
     logLevel: LogLevel,
     onDiagnostics: (method: string, params: unknown) => void,
+    linter = false,
   ) {
     this.language = language;
     this.projectRoot = projectRoot;
     this.logLevel = logLevel;
     this.onDiagnostics = onDiagnostics;
+    this.linter = linter;
   }
 
   public async start(): Promise<void> {
@@ -166,12 +171,17 @@ export class ServerSupervisor {
   }
 
   private async resolveServer(): Promise<LspCandidate | null> {
-    const available = await findAvailableLsp(this.language);
+    const available = this.linter
+      ? await findAvailableLinter(this.language)
+      : await findAvailableLsp(this.language);
     if (available) {
       return available;
     }
 
-    const candidate = getLspCandidates(this.language)[0] ?? null;
+    const candidate =
+      (this.linter
+        ? getLinterCandidates(this.language)
+        : getLspCandidates(this.language))[0] ?? null;
     if (!candidate) {
       return null;
     }

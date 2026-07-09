@@ -13,7 +13,9 @@ jest.mock('../../detection/language-detector', () => ({
 
 jest.mock('../../detection/lsp-mapping', () => ({
   findAvailableLsp: jest.fn(),
-  getLspCandidates: jest.fn()
+  getLspCandidates: jest.fn(),
+  findAvailableLinter: jest.fn(),
+  getLinterCandidates: jest.fn().mockReturnValue([])
 }));
 
 jest.mock('../installer', () => ({
@@ -357,6 +359,56 @@ describe('LifecycleManager', () => {
     expect(manager.getHealth()).toEqual([]);
     expect(manager.getReadyClients()).toEqual([]);
     expect(manager.getWorkspaceDiagnostics()).toEqual([]);
+
+    await manager.shutdown();
+  });
+
+  it('merges diagnostics from a linter server alongside the primary server for the same language', async () => {
+    const detectLanguages = jest.requireMock('../../detection/language-detector').detectLanguages as jest.MockedFunction<(projectRoot: string) => Promise<DetectedLanguage[]>>;
+    const findAvailableLsp = jest.requireMock('../../detection/lsp-mapping').findAvailableLsp as jest.MockedFunction<(language: string) => Promise<LspCandidate | null>>;
+    const getLspCandidates = jest.requireMock('../../detection/lsp-mapping').getLspCandidates as jest.MockedFunction<(language: string) => LspCandidate[]>;
+    const findAvailableLinter = jest.requireMock('../../detection/lsp-mapping').findAvailableLinter as jest.MockedFunction<(language: string) => Promise<LspCandidate | null>>;
+    const getLinterCandidates = jest.requireMock('../../detection/lsp-mapping').getLinterCandidates as jest.MockedFunction<(language: string) => LspCandidate[]>;
+    const LspClient = jest.requireMock('../lsp-client').LspClient as jest.MockedClass<typeof import('../lsp-client').LspClient>;
+
+    const ruffCandidate = { cmd: 'ruff', args: ['server', '--quiet'], pkg: 'ruff', mgr: 'pip' } satisfies LspCandidate;
+    const pyrightClient = new MockLspClient();
+    const ruffClient = new MockLspClient();
+
+    detectLanguages.mockResolvedValue([{ language: 'python', confidence: 'marker', markers: ['pyproject.toml'] }]);
+    findAvailableLsp.mockResolvedValue({ cmd: 'pyright-langserver', args: ['--stdio'], pkg: 'pyright', mgr: 'npm' });
+    getLspCandidates.mockReturnValue([]);
+    getLinterCandidates.mockReturnValue([ruffCandidate]);
+    findAvailableLinter.mockResolvedValue(ruffCandidate);
+    LspClient.mockImplementationOnce(() => pyrightClient as unknown as import('../lsp-client').LspClient);
+    LspClient.mockImplementationOnce(() => ruffClient as unknown as import('../lsp-client').LspClient);
+
+    const manager = new LifecycleManager('/workspace/project', 'debug');
+    await manager.start();
+
+    pyrightClient.emit('notification', 'textDocument/publishDiagnostics', {
+      uri: 'file:///workspace/project/app.py',
+      diagnostics: [{ message: 'Incompatible type', severity: 1, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } } }]
+    });
+    ruffClient.emit('notification', 'textDocument/publishDiagnostics', {
+      uri: 'file:///workspace/project/app.py',
+      diagnostics: [{ message: 'F401 unused import', severity: 2, range: { start: { line: 1, character: 0 }, end: { line: 1, character: 1 } } }]
+    });
+
+    expect(manager.getFileDiagnostics('/workspace/project/app.py').map((d) => d.message)).toEqual([
+      'Incompatible type',
+      'F401 unused import'
+    ]);
+    // Navigation/rename/format stay pinned to the primary server, not the linter.
+    expect(manager.getClient('python')).toBe(pyrightClient);
+    expect(manager.getReadyClients('python')).toEqual([pyrightClient]);
+    // Both servers are started and both surface in health.
+    expect(manager.getHealth()).toEqual([
+      { language: 'python', status: 'ready', capabilities: { hoverProvider: true } },
+      { language: 'python', status: 'ready', capabilities: { hoverProvider: true } }
+    ]);
+    // File-scope diagnostics touch every diagnostic-contributing server.
+    expect(manager.getDiagnosticClientsForFile('/workspace/project/app.py')).toEqual([pyrightClient, ruffClient]);
 
     await manager.shutdown();
   });

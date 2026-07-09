@@ -34,6 +34,7 @@ export interface MinimalLspClient {
 
 export interface MinimalLifecycleManager {
   getClientForFile(filePath: string): MinimalLspClient | null;
+  getDiagnosticClientsForFile(filePath: string): MinimalLspClient[];
   getReadyClients(language?: string): MinimalLspClient[];
   getFileDiagnostics(filePath: string): DiagnosticWithUri[];
   getWorkspaceDiagnostics(language?: string): DiagnosticWithUri[];

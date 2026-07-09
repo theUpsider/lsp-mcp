@@ -713,6 +713,9 @@ function createLifecycle(options: {
 }): MockLifecycle {
   return {
     getClientForFile: jest.fn((_: string) => options.fileClient ?? null),
+    getDiagnosticClientsForFile: jest.fn((_: string) =>
+      options.fileClient ? [options.fileClient] : [],
+    ),
     getReadyClients: jest.fn(
       (_: string | undefined) => options.workspaceClients ?? [],
     ),
@@ -756,6 +759,7 @@ interface MockClient {
 
 interface MockLifecycle {
   getClientForFile: jest.Mock<MockClient | null, [string]>;
+  getDiagnosticClientsForFile: jest.Mock<MockClient[], [string]>;
   getReadyClients: jest.Mock<MockClient[], [string?]>;
   getFileDiagnostics: jest.Mock<DiagnosticRecord[], [string]>;
   getWorkspaceDiagnostics: jest.Mock<DiagnosticRecord[], [string?]>;

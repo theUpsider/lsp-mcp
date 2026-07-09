@@ -159,18 +159,23 @@ export function registerReadTools(
       try {
         if (filePath) {
           await lifecycleManager.ensureLanguageForFile(filePath);
-          const client = lifecycleManager.getClientForFile(filePath);
-          if (client) {
-            const waitPromise = client.waitForDiagnosticsPublish(
-              filePath,
-              10000,
-            );
-            await client.ensureDidOpen(filePath);
-            client.notify("textDocument/didSave", {
-              textDocument: { uri: pathToUri(filePath) },
-            });
-            await waitPromise;
-          }
+          // Trigger analysis on every diagnostic source for this file's language
+          // (e.g. both pyright and ruff for python), not just the primary server,
+          // so the merged result includes type errors and lint findings alike.
+          const clients = lifecycleManager.getDiagnosticClientsForFile(filePath);
+          await Promise.all(
+            clients.map(async (client) => {
+              const waitPromise = client.waitForDiagnosticsPublish(
+                filePath,
+                10000,
+              );
+              await client.ensureDidOpen(filePath);
+              client.notify("textDocument/didSave", {
+                textDocument: { uri: pathToUri(filePath) },
+              });
+              await waitPromise;
+            }),
+          );
         }
 
         if (scope === "workspace") {

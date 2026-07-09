@@ -2,7 +2,7 @@ import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { findAvailableLsp, getLspCandidates, SUPPORTED_LANGUAGES } from '../lsp-mapping';
+import { findAvailableLinter, findAvailableLsp, getLinterCandidates, getLspCandidates, SUPPORTED_LANGUAGES } from '../lsp-mapping';
 
 describe('lsp-mapping', () => {
   it('returns the configured python LSP candidates in priority order', () => {
@@ -10,6 +10,13 @@ describe('lsp-mapping', () => {
       { cmd: 'pyright-langserver', args: ['--stdio'], pkg: 'pyright', mgr: 'npm' },
       { cmd: 'pylsp', args: [], pkg: 'python-lsp-server', mgr: 'pip' }
     ]);
+  });
+
+  it('returns ruff as the python linter candidate, run alongside the primary server', () => {
+    expect(getLinterCandidates('python')).toEqual([
+      { cmd: 'ruff', args: ['server', '--quiet'], pkg: 'ruff', mgr: 'pip' }
+    ]);
+    expect(getLinterCandidates('typescript')).toEqual([]);
   });
 
   it('returns the full supported language list and shared candidate mappings', () => {
@@ -78,6 +85,7 @@ describe('lsp-mapping', () => {
 
       await expect(findAvailableLsp('swift')).resolves.toBeNull();
       await expect(findAvailableLsp('unknown')).resolves.toBeNull();
+      await expect(findAvailableLinter('python')).resolves.toBeNull();
     } finally {
       process.env.PATH = originalPath;
       await rm(binDir, { recursive: true, force: true });

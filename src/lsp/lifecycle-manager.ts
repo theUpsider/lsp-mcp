@@ -10,6 +10,7 @@ import {
   extensionToLanguage,
   extensionsForLanguage,
 } from "../detection/language-registry";
+import { getLinterCandidates } from "../detection/lsp-mapping";
 
 import { DiagnosticStore } from "./diagnostic-store";
 import { LspClient } from "./lsp-client";
@@ -36,6 +37,11 @@ export class LifecycleManager {
   private readonly projectRoot: string;
   private readonly logLevel: "error" | "info" | "debug";
   private readonly supervisors = new Map<string, ServerSupervisor>();
+  // Secondary servers that run alongside the primary one for a language purely to
+  // contribute diagnostics (e.g. ruff's lint rules alongside pyright's type checks).
+  // They are never returned by getClient/getReadyClients, which stay scoped to the
+  // primary server so navigation/formatting/rename requests keep going to one place.
+  private readonly linterSupervisors = new Map<string, ServerSupervisor>();
   private readonly store = new DiagnosticStore();
 
   public constructor(projectRoot: string, logLevel: string) {
@@ -49,13 +55,13 @@ export class LifecycleManager {
   }
 
   public async ensureLanguage(language: string): Promise<void> {
-    if (this.supervisors.has(language)) {
-      return;
+    if (!this.supervisors.has(language)) {
+      const supervisor = this.createSupervisor(language);
+      this.supervisors.set(language, supervisor);
+      await supervisor.start();
     }
 
-    const supervisor = this.createSupervisor(language);
-    this.supervisors.set(language, supervisor);
-    await supervisor.start();
+    await this.ensureLinter(language);
   }
 
   public async ensureLanguageForFile(filePath: string): Promise<void> {
@@ -78,10 +84,28 @@ export class LifecycleManager {
     return null;
   }
 
+  // All ready clients contributing diagnostics for a file's language: the primary
+  // language server plus any linter servers (e.g. ruff for python). Used so a single
+  // lsp_diagnostics(file) call opens/saves the file on every diagnostic source instead
+  // of only the primary one.
+  public getDiagnosticClientsForFile(filePath: string): LspClient[] {
+    const language = extensionToLanguage(path.extname(filePath));
+    if (!language) {
+      return [];
+    }
+
+    return [this.supervisors.get(language), this.linterSupervisors.get(language)]
+      .filter((supervisor): supervisor is ServerSupervisor => {
+        return !!supervisor && supervisor.getHealth().status === "ready";
+      })
+      .flatMap((supervisor) => {
+        const client = supervisor.getClient();
+        return client ? [client] : [];
+      });
+  }
+
   public getHealth(): LanguageServerHealth[] {
-    return Array.from(this.supervisors.values()).map((supervisor) =>
-      supervisor.getHealth(),
-    );
+    return this.allSupervisors().map((supervisor) => supervisor.getHealth());
   }
 
   public getReadyClients(language?: string): LspClient[] {
@@ -115,7 +139,7 @@ export class LifecycleManager {
     language?: string,
   ): Promise<WorkspaceAnalysisSummary> {
     const results = await Promise.allSettled(
-      Array.from(this.supervisors.entries())
+      this.allSupervisorEntries()
         .filter(([lang, supervisor]) => {
           const health = supervisor.getHealth();
           return health.status === "ready" && (!language || lang === language);
@@ -162,19 +186,17 @@ export class LifecycleManager {
 
   public async ensureSeedFilesOpen(): Promise<void> {
     await Promise.all(
-      Array.from(this.supervisors.entries()).map(
-        async ([language, supervisor]) => {
-          const client = supervisor.getClient();
-          if (!client) return;
-          const extensions = extensionsForLanguage(language);
-          await client.ensureSeedFileOpen(extensions);
-        },
-      ),
+      this.allSupervisorEntries().map(async ([language, supervisor]) => {
+        const client = supervisor.getClient();
+        if (!client) return;
+        const extensions = extensionsForLanguage(language);
+        await client.ensureSeedFileOpen(extensions);
+      }),
     );
   }
 
   public async shutdown(): Promise<void> {
-    const supervisors = Array.from(this.supervisors.values());
+    const supervisors = this.allSupervisors();
     const results = await Promise.allSettled(
       supervisors.map(
         async (supervisor) =>
@@ -203,19 +225,47 @@ export class LifecycleManager {
       const supervisor = this.createSupervisor(entry.language);
       this.supervisors.set(entry.language, supervisor);
       await supervisor.start();
+      await this.ensureLinter(entry.language);
     }
   }
 
-  private createSupervisor(language: string): ServerSupervisor {
+  private async ensureLinter(language: string): Promise<void> {
+    if (this.linterSupervisors.has(language)) {
+      return;
+    }
+
+    if (getLinterCandidates(language).length === 0) {
+      return;
+    }
+
+    const supervisor = this.createSupervisor(language, true);
+    this.linterSupervisors.set(language, supervisor);
+    await supervisor.start();
+  }
+
+  private allSupervisors(): ServerSupervisor[] {
+    return this.allSupervisorEntries().map(([, supervisor]) => supervisor);
+  }
+
+  private allSupervisorEntries(): Array<[string, ServerSupervisor]> {
+    return [
+      ...Array.from(this.supervisors.entries()),
+      ...Array.from(this.linterSupervisors.entries()),
+    ];
+  }
+
+  private createSupervisor(language: string, linter = false): ServerSupervisor {
+    const sourceId = linter ? `${language}:lint` : language;
     return new ServerSupervisor(
       language,
       this.projectRoot,
       this.logLevel,
       (method, params) => {
         if (method === "textDocument/publishDiagnostics") {
-          this.store.store(params);
+          this.store.store(sourceId, params);
         }
       },
+      linter,
     );
   }
 }

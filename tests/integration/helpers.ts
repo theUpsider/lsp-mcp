@@ -199,6 +199,7 @@ function createLifecycleManager(
 
   return {
     getClientForFile: () => client,
+    getDiagnosticClientsForFile: () => [client],
     getReadyClients: () => [client],
     getFileDiagnostics: () => [],
     getWorkspaceDiagnostics: () => [],
