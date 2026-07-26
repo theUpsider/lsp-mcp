@@ -4,3 +4,4 @@ coverage/
 *.js.map
 .jdtls-workspace/
 .tokensave/
+.claude/
