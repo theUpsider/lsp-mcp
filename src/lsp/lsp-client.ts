@@ -7,6 +7,7 @@ import type { LspCandidate } from "../detection/lsp-mapping";
 import type { InitializeResult } from "vscode-languageserver-protocol";
 
 import { extensionToLanguageId } from "../detection/language-registry";
+import { getAugmentedEnv } from "../utils/spawn-env";
 import { pathToUri } from "../utils/uri";
 
 type LogLevel = "error" | "info" | "debug";
@@ -91,7 +92,7 @@ export class LspClient extends EventEmitter {
 
     this.process = spawn(this.serverDef.cmd, this.serverDef.args, {
       cwd: this.projectRoot,
-      env: { ...process.env },
+      env: getAugmentedEnv(),
       stdio: "pipe",
     });
 

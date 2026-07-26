@@ -1,6 +1,7 @@
 import { exec } from 'node:child_process';
 
 import type { LspCandidate } from '../detection/lsp-mapping';
+import { getAugmentedEnv } from '../utils/spawn-env';
 
 export async function installLsp(candidate: LspCandidate): Promise<{ success: boolean; error?: string; instructions?: string }> {
   const command = getInstallCommand(candidate);
@@ -14,7 +15,7 @@ export async function installLsp(candidate: LspCandidate): Promise<{ success: bo
   }
 
   return await new Promise((resolve) => {
-    exec(command, { env: process.env }, (error) => {
+    exec(command, { env: getAugmentedEnv() }, (error) => {
       if (error) {
         resolve({
           success: false,
