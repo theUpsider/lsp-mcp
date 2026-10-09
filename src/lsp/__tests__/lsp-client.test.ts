@@ -311,6 +311,12 @@ describe('LspClient', () => {
       await writeFile(brokenPath, 'const c = 1;\n');
       await chmod(brokenPath, 0o000);
 
+      if (process.platform === 'win32') {
+        // Running on Windows: chmod 0o000 does not block reads (ACL-based permissions),
+        // so this test cannot apply.
+        return;
+      }
+
       if (process.getuid?.() === 0) {
         // Running as root: chmod 0o000 does not block reads, so this test cannot apply.
         return;
