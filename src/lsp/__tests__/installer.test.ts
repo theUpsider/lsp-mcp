@@ -24,9 +24,13 @@ describe('installLsp', () => {
 
     const result = await installLsp({ cmd: 'typescript-language-server', args: ['--stdio'], pkg: 'typescript-language-server', mgr: 'npm' });
 
+    const expectedCommand = process.platform === 'win32'
+      ? 'npm install --global typescript-language-server'
+      : 'npm install --global --prefix "$HOME/.local" typescript-language-server';
+
     expect(result).toEqual({ success: true });
     expect(exec).toHaveBeenCalledWith(
-      'npm install --global --prefix "$HOME/.local" typescript-language-server',
+      expectedCommand,
       expect.objectContaining({ env: process.env }),
       expect.any(Function)
     );

@@ -95,6 +95,7 @@ export class LspClient extends EventEmitter {
       cwd: this.projectRoot,
       env: getAugmentedEnv(),
       stdio: "pipe",
+      shell: process.platform === "win32",
     });
 
     this.process.stdout.on("data", (chunk: Buffer | string) => {
