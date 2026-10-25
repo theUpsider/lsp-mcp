@@ -33,7 +33,9 @@ export async function installLsp(candidate: LspCandidate): Promise<{ success: bo
 function getInstallCommand(candidate: LspCandidate): string | null {
   switch (candidate.mgr) {
     case 'npm':
-      return `npm install --global --prefix "$HOME/.local" ${candidate.pkg}`;
+      return process.platform === 'win32'
+        ? `npm install --global ${candidate.pkg}`
+        : `npm install --global --prefix "$HOME/.local" ${candidate.pkg}`;
     case 'pip':
       return `pip install --user ${candidate.pkg}`;
     case 'go':
