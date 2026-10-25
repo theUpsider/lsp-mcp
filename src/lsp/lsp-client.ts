@@ -7,6 +7,7 @@ import type { LspCandidate } from "../detection/lsp-mapping";
 import type { InitializeResult } from "vscode-languageserver-protocol";
 
 import { extensionToLanguageId } from "../detection/language-registry";
+import { getAugmentedEnv } from "../utils/spawn-env";
 import { pathToUri } from "../utils/uri";
 
 type LogLevel = "error" | "info" | "debug";
@@ -72,6 +73,7 @@ export class LspClient extends EventEmitter {
   private initializeResult: InitializeResult | null = null;
   private forcedKillTimer: NodeJS.Timeout | null = null;
   private readonly openedFiles = new Set<string>();
+  private readonly fileVersions = new Map<string, number>();
 
   public constructor(
     serverDef: LspCandidate,
@@ -91,7 +93,7 @@ export class LspClient extends EventEmitter {
 
     this.process = spawn(this.serverDef.cmd, this.serverDef.args, {
       cwd: this.projectRoot,
-      env: { ...process.env },
+      env: getAugmentedEnv(),
       stdio: "pipe",
     });
 
@@ -189,6 +191,8 @@ export class LspClient extends EventEmitter {
 
   public async shutdown(): Promise<void> {
     this.exitExpected = true;
+    this.openedFiles.clear();
+    this.fileVersions.clear();
     if (!this.process) {
       this.ready = false;
       return;
@@ -234,20 +238,26 @@ export class LspClient extends EventEmitter {
   }
 
   public async ensureDidOpen(filePath: string): Promise<void> {
-    if (this.openedFiles.has(filePath)) {
-      return;
-    }
-
     const text = await readFile(filePath, "utf8");
-    this.notify("textDocument/didOpen", {
-      textDocument: {
-        uri: pathToUri(filePath),
-        languageId: extensionToLanguageId(path.extname(filePath)),
-        version: 1,
-        text,
-      },
-    });
-    this.openedFiles.add(filePath);
+    const uri = pathToUri(filePath);
+    const languageId = extensionToLanguageId(path.extname(filePath));
+
+    if (!this.openedFiles.has(filePath)) {
+      // First open: send didOpen with initial content
+      this.notify("textDocument/didOpen", {
+        textDocument: { uri, languageId, version: 1, text },
+      });
+      this.fileVersions.set(filePath, 1);
+      this.openedFiles.add(filePath);
+    } else {
+      // Already open: send didChange with full-text replacement to sync disk content
+      const version = (this.fileVersions.get(filePath) ?? 0) + 1;
+      this.notify("textDocument/didChange", {
+        textDocument: { uri, version },
+        contentChanges: [{ text }],
+      });
+      this.fileVersions.set(filePath, version);
+    }
   }
 
   public async ensureSeedFileOpen(extensions: string[]): Promise<void> {

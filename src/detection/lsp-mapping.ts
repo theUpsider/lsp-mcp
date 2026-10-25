@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { getAugmentedEnv } from '../utils/spawn-env';
+
 const execFileAsync = promisify(execFile);
 
 export interface LspCandidate {
@@ -109,7 +111,7 @@ async function commandExists(command: string): Promise<boolean> {
   const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
 
   try {
-    await execFileAsync(lookupCommand, [command], { env: { ...process.env } });
+    await execFileAsync(lookupCommand, [command], { env: getAugmentedEnv() });
     return true;
   } catch {
     return false;

@@ -2,10 +2,9 @@
     "mcpServers": {
         "lsp-mcp": {
             "type": "stdio",
-            "command": "npx",
+            "command": "node",
             "args": [
-                "-y",
-                "@theupsider/lsp-mcp"
+                "dist/index.js"
             ]
         }
     }
