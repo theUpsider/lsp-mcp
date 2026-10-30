@@ -75,6 +75,21 @@ describe("McpServer", () => {
     expect(mockConnect).toHaveBeenCalledWith({ kind: "stdio" });
   });
 
+  it("announces the package name and package.json version in the MCP handshake", () => {
+    const { McpServer: SdkMcpServer } = jest.requireMock(
+      "@modelcontextprotocol/sdk/server/mcp.js",
+    ) as { McpServer: jest.Mock };
+    const { name, version } = jest.requireActual("../../../package.json") as {
+      name: string;
+      version: string;
+    };
+
+    new McpServer("info");
+
+    expect(SdkMcpServer).toHaveBeenCalledWith({ name, version });
+    expect(version).not.toBe("0.1.0");
+  });
+
   it("sets oninitialized callback on start", async () => {
     const server = new McpServer("info");
     await server.start();
