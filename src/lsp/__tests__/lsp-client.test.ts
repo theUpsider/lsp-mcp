@@ -54,6 +54,8 @@ describe('LspClient', () => {
     expect(getObject(initializeMessage.params).workspaceFolders).toEqual([
       { uri: 'file:///workspace/project', name: 'project' }
     ]);
+    const { version } = jest.requireActual('../../../package.json') as { version: string };
+    expect(getObject(initializeMessage.params).clientInfo).toEqual({ name: 'lsp-mcp', version });
 
     child.stdout.write(encodeMessage({
       jsonrpc: '2.0',
