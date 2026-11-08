@@ -9,6 +9,7 @@ import type { InitializeResult } from "vscode-languageserver-protocol";
 import { extensionToLanguageId } from "../detection/language-registry";
 import { getAugmentedEnv } from "../utils/spawn-env";
 import { pathToUri } from "../utils/uri";
+import { getVersion, LSP_CLIENT_NAME } from "../utils/version";
 
 type LogLevel = "error" | "info" | "debug";
 
@@ -115,7 +116,7 @@ export class LspClient extends EventEmitter {
       "initialize",
       {
         processId: process.pid,
-        clientInfo: { name: "lsp-mcp", version: "0.1.0" },
+        clientInfo: { name: LSP_CLIENT_NAME, version: getVersion() },
         rootUri: pathToUri(this.projectRoot),
         workspaceFolders: [
           {

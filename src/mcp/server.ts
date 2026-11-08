@@ -25,6 +25,7 @@ import {
   loadWorkspaceConfig,
   saveWorkspaceConfig,
 } from "../utils/workspace-config";
+import { getVersion, MCP_SERVER_NAME } from "../utils/version";
 
 import { registerReadTools } from "./tools/read-tools";
 import { registerWriteTools } from "./tools/write-tools";
@@ -48,8 +49,8 @@ export class McpServer {
     this.logLevel = logLevel;
     this.createLifecycleManager = createLifecycleManager;
     this.server = new SdkMcpServer({
-      name: "@theupsider/lsp-mcp",
-      version: "0.1.0",
+      name: MCP_SERVER_NAME,
+      version: getVersion(),
     });
   }
 

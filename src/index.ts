@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
 import { McpServer } from "./mcp/server";
+import { getVersion } from "./utils/version";
 
 interface MainOverrides {
   stdout?: (text: string) => void;
@@ -34,7 +32,7 @@ export async function main(
     });
 
   if (argv.includes("--version")) {
-    stdout(`${readVersion()}\n`);
+    stdout(`${getVersion()}\n`);
     exit(0);
     return;
   }
@@ -55,11 +53,6 @@ export async function main(
 
   onSignal("SIGINT", shutdown);
   onSignal("SIGTERM", shutdown);
-}
-
-function readVersion(): string {
-  const packageJsonPath = path.resolve(__dirname, "..", "package.json");
-  return JSON.parse(readFileSync(packageJsonPath, "utf8")).version as string;
 }
 
 if (require.main === module) {
